@@ -827,6 +827,124 @@ void nvme_nvm_unregister(struct nvme_ns *ns)
 	nvm_unregister(ns->ndev);
 }
 
+struct nvme_nvm_zone {
+	struct ppa_addr ppa;
+	int block_state;
+};
+
+int nvme_nvm_zone_report(struct nvme_ns *ns, struct request *req,
+		struct nvme_command *cmd)
+{
+	struct nvm_dev *ndev = ns->ndev;
+	struct blk_zone_report_hdr *hdr;
+	struct blk_zone *zone;
+	struct nvme_nvm_zone *nvm_zones;
+	struct bio_vec *bv;
+	unsigned int i, j, z = 0, first = 1;
+	unsigned int max_zones, nr_zones = 0;
+	u8 *blk_state;
+	int ch, lun, ret = 0;
+	struct ppa_addr ppa;
+	void *addr;
+	int zones_per_page = PAGE_SIZE / sizeof(struct blk_zone);
+
+	blk_state = kzalloc(ndev->geo.blks_per_lun, GFP_KERNEL);
+	if (!blk_state)
+		return -ENOMEM;
+
+	max_zones = (blk_rq_bytes(req) / sizeof(struct blk_zone)) - 1;
+
+	nvm_zones = kzalloc(sizeof(struct nvme_nvm_zone) * max_zones,
+								GFP_KERNEL);
+	if (!nvm_zones) {
+		kfree(blk_state);
+		return -ENOMEM;
+	}
+
+	printk("Max zones to fill: %u\n", max_zones);
+
+	/* retrieve bad block state for available zones */
+	ppa.ppa = 0;
+	for (ch = 0; ch < ndev->geo.nr_chnls; ch++) {
+		ppa.g.ch = ch;
+		for (lun = 0; lun < ndev->geo.nr_luns; lun++) {
+			ppa.g.lun = lun;
+
+			ret = nvme_nvm_get_bb_tbl(ndev, ppa, blk_state);
+			if (ret) {
+				printk("nvm: failed to retrieve bb table\n");
+				goto out;
+			}
+
+			for (i = 0; i < ndev->geo.blks_per_lun;
+						i += ndev->geo.nr_planes) {
+				int state = 0;
+
+				ppa.g.blk = i / ndev->geo.nr_planes;
+				for (j = 0; j < ndev->geo.nr_planes; j++)
+					state += blk_state[i + j];
+
+				nvm_zones[nr_zones].ppa = ppa;
+				nvm_zones[nr_zones].block_state = state;
+
+				nr_zones++;
+				if (nr_zones >= max_zones)
+					goto done;
+			}
+		}
+	}
+done:
+
+	/* Write state to blk zone data structure */
+	bio_for_each_segment_all(bv, req->bio, i) {
+
+		if (!bv->bv_page)
+			break;
+
+		j = 0;
+		addr = kmap_atomic(bv->bv_page);
+
+		if (first) {
+			hdr = (struct blk_zone_report_hdr *)addr;
+			hdr->nr_zones = nr_zones;
+			first = 0;
+			j++;
+		}
+
+		for (; j < zones_per_page; j++) {
+			struct ppa_addr p = __generic_to_dev_addr(&ndev->geo,
+							nvm_zones[z].ppa);
+
+			zone = ((struct blk_zone *)addr) + j;
+			zone->start = p.ppa << 3;
+			zone->len = ndev->geo.sec_per_blk << 3;
+			zone->wp = 0;
+			zone->type = 2;
+			if (nvm_zones[z].block_state)
+				zone->cond = BLK_ZONE_COND_OFFLINE;
+			else
+				zone->cond = BLK_ZONE_COND_EMPTY;
+			zone->non_seq = 0;
+			zone->reset = 1;
+			z++;
+		}
+
+		kunmap_atomic(addr);
+	}
+out:
+	kfree(nvm_zones);
+	kfree(blk_state);
+	return ret;
+}
+
+int nvme_nvm_zone_reset(struct nvme_ns *ns, struct request *req,
+		struct nvme_command *cmd)
+{
+	printk("ZONE RESET\n");
+
+	return 0;
+}
+
 static ssize_t nvm_dev_attr_show(struct device *dev,
 				 struct device_attribute *dattr, char *page)
 {
@@ -977,6 +1095,12 @@ static const struct attribute_group nvm_dev_attr_group = {
 
 int nvme_nvm_register_sysfs(struct nvme_ns *ns)
 {
+	struct nvm_dev *ndev = ns->ndev;
+	sector_t sectors = ndev->geo.sec_per_blk << 3;
+
+	blk_queue_chunk_sectors(ns->queue, sectors);
+	ns->queue->limits.zoned = BLK_ZONED_HM;
+
 	return sysfs_create_group(&disk_to_dev(ns->disk)->kobj,
 					&nvm_dev_attr_group);
 }

@@ -596,6 +596,16 @@ static int nvme_queue_rq(struct blk_mq_hw_ctx *hctx,
 		}
 	}
 
+	if (req_op(req) == REQ_OP_ZONE_REPORT) {
+		ret = nvme_nvm_zone_report(ns, req, &cmnd);
+		blk_mq_end_request(req, ret);
+		return BLK_MQ_RQ_QUEUE_OK;
+	} else if (req_op(req) == REQ_OP_ZONE_RESET) {
+		ret = nvme_nvm_zone_reset(ns, req, &cmnd);
+		blk_mq_end_request(req, ret);
+		return BLK_MQ_RQ_QUEUE_OK;
+	}
+
 	ret = nvme_setup_cmd(ns, req, &cmnd);
 	if (ret != BLK_MQ_RQ_QUEUE_OK)
 		return ret;

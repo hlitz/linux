@@ -309,6 +309,7 @@ enum blk_zoned_model {
 	BLK_ZONED_NONE,	/* Regular block device */
 	BLK_ZONED_HA,	/* Host-aware zoned block device */
 	BLK_ZONED_HM,	/* Host-managed zoned block device */
+	BLK_ZONED_OC,	/* Host-managed open-channel block device */
 };
 
 struct queue_limits {

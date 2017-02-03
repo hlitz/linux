@@ -766,12 +766,21 @@ static int nvme_ioctl(struct block_device *bdev, fmode_t mode,
 		unsigned int cmd, unsigned long arg)
 {
 	struct nvme_ns *ns = bdev->bd_disk->private_data;
+	struct blk_zone *zones;
+	int ret;
+	unsigned int nr_zones;
 
 	switch (cmd) {
 	case NVME_IOCTL_ID:
 		force_successful_syscall_return();
 		return ns->ns_id;
 	case NVME_IOCTL_ADMIN_CMD:
+		nr_zones = 4096;
+		zones = kcalloc(nr_zones, sizeof(struct blk_zone),
+				GFP_KERNEL);
+		if (!zones)
+			return -ENOMEM;
+		ret = blkdev_report_zones(bdev, 0, zones, &nr_zones, GFP_KERNEL);
 		return nvme_user_cmd(ns->ctrl, NULL, (void __user *)arg);
 	case NVME_IOCTL_IO_CMD:
 		return nvme_user_cmd(ns->ctrl, ns, (void __user *)arg);

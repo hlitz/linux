@@ -182,7 +182,8 @@ int blkdev_report_zones(struct block_device *bdev,
 	*nr_zones = nz;
 out:
 	bio_for_each_segment_all(bv, bio, i)
-		__free_page(bv->bv_page);
+		if (bv->bv_page)
+			__free_page(bv->bv_page);
 	bio_put(bio);
 
 	return ret;

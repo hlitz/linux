@@ -327,6 +327,8 @@ void nvme_nvm_unregister(struct nvme_ns *ns);
 int nvme_nvm_register_sysfs(struct nvme_ns *ns);
 void nvme_nvm_unregister_sysfs(struct nvme_ns *ns);
 int nvme_nvm_ioctl(struct nvme_ns *ns, unsigned int cmd, unsigned long arg);
+int nvme_nvm_zone_report(struct nvme_ns *ns, struct request *req, struct nvme_command *cmd);
+int nvme_nvm_zone_reset(struct nvme_ns *ns, struct request *req, struct nvme_command *cmd);
 #else
 static inline int nvme_nvm_register(struct nvme_ns *ns, char *disk_name,
 				    int node)
@@ -348,6 +350,16 @@ static inline int nvme_nvm_ioctl(struct nvme_ns *ns, unsigned int cmd,
 							unsigned long arg)
 {
 	return -ENOTTY;
+}
+static int nvme_nvm_zone_report(struct nvme_ns *ns, struct request *req,
+		struct nvme_command *cmd)
+{
+	return -EINVAL;
+}
+static int nvme_nvm_zone_reset(struct nvme_ns *ns, struct request *req,
+		struct nvme_command *cmd)
+{
+	return -EINVAL;
 }
 #endif /* CONFIG_NVM */
 
