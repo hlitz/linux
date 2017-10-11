@@ -319,12 +319,25 @@ enum {
 #define PBLK_MAGIC 0x70626c6b /*pblk*/
 #define SMETA_VERSION cpu_to_le16(1)
 
+/* Data line persistent storage format version:
+ * Changes in major version requires offline migration.
+ * Changes in minor version are handled automatically during
+ * recovery.
+ */
+
+#define PBLK_LINE_VER_MAJOR(x) (((x)>>8) & 0xff)
+#define PBLK_LINE_VER_MINOR(x) ((x) & 0xff)
+#define PBLK_LINE_VER(major, minor) (((major) << 8) | (minor))
+
+/* Current version*/
+#define PBLK_LINE_CURRENT_VER PBLK_LINE_VER(0, 1)
+
 struct line_header {
 	__le32 crc;
 	__le32 identifier;	/* pblk identifier */
 	__u8 uuid[16];		/* instance uuid */
 	__le16 type;		/* line type */
-	__le16 version;		/* type version */
+	__le16 version;		/* type version: 8 bits major + 8 bits minor */
 	__le32 id;		/* line id for current line */
 };
 

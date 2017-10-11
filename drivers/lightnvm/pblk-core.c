@@ -998,6 +998,11 @@ static int pblk_line_init_metadata(struct pblk *pblk, struct pblk_line *line,
 	/* End metadata */
 	memcpy(&emeta_buf->header, &smeta_buf->header,
 						sizeof(struct line_header));
+
+	emeta_buf->header.version = cpu_to_le16(PBLK_LINE_CURRENT_VER);
+	emeta_buf->header.crc = cpu_to_le32(
+			pblk_calc_meta_header_crc(pblk, &emeta_buf->header));
+
 	emeta_buf->seq_nr = cpu_to_le64(line->seq_nr);
 	emeta_buf->nr_lbas = cpu_to_le64(line->sec_in_line);
 	emeta_buf->nr_valid_lbas = cpu_to_le64(0);

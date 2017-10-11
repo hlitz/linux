@@ -826,6 +826,32 @@ static u64 pblk_line_emeta_start(struct pblk *pblk, struct pblk_line *line)
 	return emeta_start;
 }
 
+static int pblk_recov_check_line_version(struct pblk *pblk,
+					 struct line_emeta *emeta)
+{
+	struct line_header *header = &emeta->header;
+	int line_v, current_v;
+
+	line_v = PBLK_LINE_VER_MAJOR(le16_to_cpu(header->version));
+	current_v = PBLK_LINE_VER_MAJOR(PBLK_LINE_CURRENT_VER);
+
+	if (line_v != current_v) {
+		pr_err("pblk: line major version mismatch: %d, expected: %d\n",
+		       line_v, current_v);
+		return 1;
+	}
+
+#ifdef NVM_DEBUG
+	line_v = PBLK_LINE_VER_MINOR(le16_to_cpu(header->version));
+	current_v = PBLK_LINE_VER_MINOR(PBLK_LINE_CURRENT_VER);
+
+	if (current_v < line_v)
+		pr_info("pblk: newer line minor version found: %d\n", line_v);
+#endif
+
+	return 0;
+}
+
 struct pblk_line *pblk_recov_l2p(struct pblk *pblk)
 {
 	struct pblk_line_meta *lm = &pblk->lm;
@@ -942,6 +968,9 @@ struct pblk_line *pblk_recov_l2p(struct pblk *pblk)
 			pblk_recov_l2p_from_oob(pblk, line);
 			goto next;
 		}
+
+		if (pblk_recov_check_line_version(pblk, line->emeta->buf))
+			return ERR_PTR(-EINVAL);
 
 		if (pblk_recov_l2p_from_emeta(pblk, line))
 			pblk_recov_l2p_from_oob(pblk, line);
