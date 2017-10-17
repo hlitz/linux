@@ -31,7 +31,6 @@
 
 enum nvme_nvm_admin_opcode {
 	nvme_nvm_admin_identity		= 0xe2,
-	nvme_nvm_admin_get_l2p_tbl	= 0xea,
 	nvme_nvm_admin_get_bb_tbl	= 0xf2,
 	nvme_nvm_admin_set_bb_tbl	= 0xf1,
 };
@@ -332,62 +331,6 @@ out:
 	return ret;
 }
 
-static int nvme_nvm_get_l2p_tbl(struct nvm_dev *nvmdev, u64 slba, u32 nlb,
-				nvm_l2p_update_fn *update_l2p, void *priv)
-{
-	struct nvme_ns *ns = nvmdev->q->queuedata;
-	struct nvme_nvm_command c = {};
-	u32 len = queue_max_hw_sectors(ns->ctrl->admin_q) << 9;
-	u32 nlb_pr_rq = len / sizeof(u64);
-	u64 cmd_slba = slba;
-	void *entries;
-	int ret = 0;
-
-	c.l2p.opcode = nvme_nvm_admin_get_l2p_tbl;
-	c.l2p.nsid = cpu_to_le32(ns->ns_id);
-	entries = kmalloc(len, GFP_KERNEL);
-	if (!entries)
-		return -ENOMEM;
-
-	while (nlb) {
-		u32 cmd_nlb = min(nlb_pr_rq, nlb);
-		u64 elba = slba + cmd_nlb;
-
-		c.l2p.slba = cpu_to_le64(cmd_slba);
-		c.l2p.nlb = cpu_to_le32(cmd_nlb);
-
-		ret = nvme_submit_sync_cmd(ns->ctrl->admin_q,
-				(struct nvme_command *)&c, entries, len);
-		if (ret) {
-			dev_err(ns->ctrl->device,
-				"L2P table transfer failed (%d)\n", ret);
-			ret = -EIO;
-			goto out;
-		}
-
-		if (unlikely(elba > nvmdev->total_secs)) {
-			pr_err("nvm: L2P data from device is out of bounds!\n");
-			ret = -EINVAL;
-			goto out;
-		}
-
-		/* Transform physical address to target address space */
-		nvm_part_to_tgt(nvmdev, entries, cmd_nlb);
-
-		if (update_l2p(cmd_slba, cmd_nlb, entries, priv)) {
-			ret = -EINTR;
-			goto out;
-		}
-
-		cmd_slba += cmd_nlb;
-		nlb -= cmd_nlb;
-	}
-
-out:
-	kfree(entries);
-	return ret;
-}
-
 static int nvme_nvm_get_bb_tbl(struct nvm_dev *nvmdev, struct ppa_addr ppa,
 								u8 *blks)
 {
@@ -596,8 +539,6 @@ static void nvme_nvm_dev_dma_free(void *pool, void *addr,
 
 static struct nvm_dev_ops nvme_nvm_dev_ops = {
 	.identity		= nvme_nvm_identity,
-
-	.get_l2p_tbl		= nvme_nvm_get_l2p_tbl,
 
 	.get_bb_tbl		= nvme_nvm_get_bb_tbl,
 	.set_bb_tbl		= nvme_nvm_set_bb_tbl,
