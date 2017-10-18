@@ -156,8 +156,6 @@ struct nvm_id_lp_tbl {
 };
 
 struct nvm_id_group {
-	u8	mtype;
-	u8	fmtype;
 	u8	num_ch;
 	u8	num_lun;
 	u8	num_pln;

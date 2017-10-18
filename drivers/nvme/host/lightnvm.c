@@ -256,8 +256,6 @@ static int init_grps(struct nvm_id *nvm_id, struct nvme_nvm_id *nvme_nvm_id)
 	src = &nvme_nvm_id->groups[0];
 	dst = &nvm_id->grp;
 
-	dst->mtype = src->mtype;
-	dst->fmtype = src->fmtype;
 	dst->num_ch = src->num_ch;
 	dst->num_lun = src->num_lun;
 	dst->num_pln = src->num_pln;
@@ -799,10 +797,6 @@ static ssize_t nvm_dev_attr_show(struct device *dev,
 			id->ppaf.blk_offset, id->ppaf.blk_len,
 			id->ppaf.pg_offset, id->ppaf.pg_len,
 			id->ppaf.sect_offset, id->ppaf.sect_len);
-	} else if (strcmp(attr->name, "media_type") == 0) {	/* u8 */
-		return scnprintf(page, PAGE_SIZE, "%u\n", grp->mtype);
-	} else if (strcmp(attr->name, "flash_media_type") == 0) {
-		return scnprintf(page, PAGE_SIZE, "%u\n", grp->fmtype);
 	} else if (strcmp(attr->name, "num_channels") == 0) {
 		return scnprintf(page, PAGE_SIZE, "%u\n", grp->num_ch);
 	} else if (strcmp(attr->name, "num_luns") == 0) {

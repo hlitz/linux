@@ -782,11 +782,6 @@ static int nvm_core_init(struct nvm_dev *dev)
 	if (grp->mpos & 0x040404)
 		geo->plane_mode = NVM_PLANE_QUAD;
 
-	if (grp->mtype != 0) {
-		pr_err("nvm: memory type not supported\n");
-		return -EINVAL;
-	}
-
 	/* calculated values */
 	geo->sec_per_pl = geo->sec_per_pg * geo->nr_planes;
 	geo->sec_per_blk = geo->sec_per_pl * geo->pgs_per_blk;
