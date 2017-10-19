@@ -166,7 +166,7 @@ struct nvme_nvm_id_group {
 	__u8			num_lun;
 	__u8			num_pln;
 	__u8			rsvd1;
-	__le16			num_blk;
+	__le16			num_chk;
 	__le16			num_pg;
 	__le16			fpg_sz;
 	__le16			csecs;
@@ -248,34 +248,49 @@ static inline void _nvme_nvm_check_size(void)
 static int init_grps(struct nvm_id *nvm_id, struct nvme_nvm_id *nvme_nvm_id)
 {
 	struct nvme_nvm_id_group *src;
-	struct nvm_id_group *dst;
+	struct nvm_id_group *grp;
+	int sec_per_pg, sec_per_pl, pg_per_blk;
 
 	if (nvme_nvm_id->cgrps != 1)
 		return -EINVAL;
 
 	src = &nvme_nvm_id->groups[0];
-	dst = &nvm_id->grp;
+	grp = &nvm_id->grp;
 
-	dst->num_ch = src->num_ch;
-	dst->num_lun = src->num_lun;
-	dst->num_pln = src->num_pln;
+	grp->num_ch = src->num_ch;
+	grp->num_lun = src->num_lun;
 
-	dst->num_pg = le16_to_cpu(src->num_pg);
-	dst->num_blk = le16_to_cpu(src->num_blk);
-	dst->fpg_sz = le16_to_cpu(src->fpg_sz);
-	dst->csecs = le16_to_cpu(src->csecs);
-	dst->sos = le16_to_cpu(src->sos);
+	grp->num_chk = le16_to_cpu(src->num_chk);
+	grp->csecs = le16_to_cpu(src->csecs);
+	grp->sos = le16_to_cpu(src->sos);
 
-	dst->trdt = le32_to_cpu(src->trdt);
-	dst->trdm = le32_to_cpu(src->trdm);
-	dst->tprt = le32_to_cpu(src->tprt);
-	dst->tprm = le32_to_cpu(src->tprm);
-	dst->tbet = le32_to_cpu(src->tbet);
-	dst->tbem = le32_to_cpu(src->tbem);
-	dst->mpos = le32_to_cpu(src->mpos);
-	dst->mccap = le32_to_cpu(src->mccap);
+	pg_per_blk = le16_to_cpu(src->num_pg);
+	sec_per_pg = le16_to_cpu(src->fpg_sz) / grp->csecs;
+	sec_per_pl = sec_per_pg * src->num_pln;
+	grp->clba = sec_per_pl * pg_per_blk;
+	grp->ws_per_chk = pg_per_blk;
 
-	dst->cpar = le16_to_cpu(src->cpar);
+	grp->mpos = le32_to_cpu(src->mpos);
+	grp->cpar = le16_to_cpu(src->cpar);
+	grp->mccap = le32_to_cpu(src->mccap);
+
+	grp->ws_opt = grp->ws_min = sec_per_pg;
+	grp->ws_seq = NVM_IO_SNGL_ACCESS;
+
+	if (grp->mpos & 0x020202) {
+		grp->ws_seq = NVM_IO_DUAL_ACCESS;
+		grp->ws_opt <<= 1;
+	} else if (grp->mpos & 0x040404) {
+		grp->ws_seq = NVM_IO_QUAD_ACCESS;
+		grp->ws_opt <<= 2;
+	}
+
+	grp->trdt = le32_to_cpu(src->trdt);
+	grp->trdm = le32_to_cpu(src->trdm);
+	grp->tprt = le32_to_cpu(src->tprt);
+	grp->tprm = le32_to_cpu(src->tprm);
+	grp->tbet = le32_to_cpu(src->tbet);
+	grp->tbem = le32_to_cpu(src->tbem);
 
 	return 0;
 }
@@ -324,7 +339,7 @@ static int nvme_nvm_get_bb_tbl(struct nvm_dev *nvmdev, struct ppa_addr ppa,
 	struct nvme_ctrl *ctrl = ns->ctrl;
 	struct nvme_nvm_command c = {};
 	struct nvme_nvm_bb_tbl *bb_tbl;
-	int nr_blks = geo->blks_per_lun * geo->plane_mode;
+	int nr_blks = geo->nr_chks * geo->plane_mode;
 	int tblsz = sizeof(struct nvme_nvm_bb_tbl) + nr_blks;
 	int ret = 0;
 
@@ -365,7 +380,7 @@ static int nvme_nvm_get_bb_tbl(struct nvm_dev *nvmdev, struct ppa_addr ppa,
 		goto out;
 	}
 
-	memcpy(blks, bb_tbl->blk, geo->blks_per_lun * geo->plane_mode);
+	memcpy(blks, bb_tbl->blk, geo->nr_chks * geo->plane_mode);
 out:
 	kfree(bb_tbl);
 	return ret;
@@ -801,14 +816,8 @@ static ssize_t nvm_dev_attr_show(struct device *dev,
 		return scnprintf(page, PAGE_SIZE, "%u\n", grp->num_ch);
 	} else if (strcmp(attr->name, "num_luns") == 0) {
 		return scnprintf(page, PAGE_SIZE, "%u\n", grp->num_lun);
-	} else if (strcmp(attr->name, "num_planes") == 0) {
-		return scnprintf(page, PAGE_SIZE, "%u\n", grp->num_pln);
 	} else if (strcmp(attr->name, "num_blocks") == 0) {	/* u16 */
-		return scnprintf(page, PAGE_SIZE, "%u\n", grp->num_blk);
-	} else if (strcmp(attr->name, "num_pages") == 0) {
-		return scnprintf(page, PAGE_SIZE, "%u\n", grp->num_pg);
-	} else if (strcmp(attr->name, "page_size") == 0) {
-		return scnprintf(page, PAGE_SIZE, "%u\n", grp->fpg_sz);
+		return scnprintf(page, PAGE_SIZE, "%u\n", grp->num_chk);
 	} else if (strcmp(attr->name, "hw_sector_size") == 0) {
 		return scnprintf(page, PAGE_SIZE, "%u\n", grp->csecs);
 	} else if (strcmp(attr->name, "oob_sector_size") == 0) {/* u32 */
