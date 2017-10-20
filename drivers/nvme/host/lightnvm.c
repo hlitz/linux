@@ -384,7 +384,7 @@ static void nvme_nvm_set_addr_20(struct nvm_addr_format *dst,
 	dst->sec_len = src->sec_len;
 
 	dst->sec_offset = 0;
-	dst->chk_offset = dst->sec_offset;
+	dst->chk_offset = dst->sec_len;
 	dst->lun_offset = dst->chk_offset + dst->chk_len;
 	dst->ch_offset = dst->lun_offset + dst->lun_len;
 

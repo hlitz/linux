@@ -123,7 +123,7 @@ static ssize_t pblk_sysfs_ppaf(struct pblk *pblk, char *page)
 
 		sz = snprintf(page, PAGE_SIZE - sz,
 			"g:(b:%d)blk:%d/%d,pg:%d/%d,lun:%d/%d,ch:%d/%d,pl:%d/%d,sec:%d/%d\n",
-			pblk->ppaf_bitsize,
+			pblk->addrf_len,
 			ppaf->blk_offset, ppaf->blk_len,
 			ppaf->pg_offset, ppaf->pg_len,
 			ppaf->lun_offset, ppaf->lun_len,
