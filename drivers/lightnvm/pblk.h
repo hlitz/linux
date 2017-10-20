@@ -558,21 +558,6 @@ struct pblk_line_meta {
 	unsigned int meta_distance;	/* Distance between data and metadata */
 };
 
-struct pblk_addr_format {
-	u64	ch_mask;
-	u64	lun_mask;
-	u64	pln_mask;
-	u64	blk_mask;
-	u64	pg_mask;
-	u64	sec_mask;
-	u8	ch_offset;
-	u8	lun_offset;
-	u8	pln_offset;
-	u8	blk_offset;
-	u8	pg_offset;
-	u8	sec_offset;
-};
-
 enum {
 	PBLK_STATE_RUNNING = 0,
 	PBLK_STATE_STOPPING = 1,
@@ -593,7 +578,7 @@ struct pblk {
 	struct pblk_line_meta lm;		/* Line metadata */
 
 	int ppaf_bitsize;
-	struct pblk_addr_format ppaf;
+	struct nvm_addr_format addrf;
 
 	struct pblk_rb rwb;
 
@@ -971,15 +956,25 @@ static inline int pblk_ppa_to_pos(struct nvm_geo *geo, struct ppa_addr p)
 static inline struct ppa_addr addr_to_gen_ppa(struct pblk *pblk, u64 paddr,
 					      u64 line_id)
 {
+	struct nvm_tgt_dev *dev = pblk->dev;
+	struct nvm_geo *geo = &dev->geo;
 	struct ppa_addr ppa;
 
-	ppa.ppa = 0;
-	ppa.g.blk = line_id;
-	ppa.g.pg = (paddr & pblk->ppaf.pg_mask) >> pblk->ppaf.pg_offset;
-	ppa.g.lun = (paddr & pblk->ppaf.lun_mask) >> pblk->ppaf.lun_offset;
-	ppa.g.ch = (paddr & pblk->ppaf.ch_mask) >> pblk->ppaf.ch_offset;
-	ppa.g.pl = (paddr & pblk->ppaf.pln_mask) >> pblk->ppaf.pln_offset;
-	ppa.g.sec = (paddr & pblk->ppaf.sec_mask) >> pblk->ppaf.sec_offset;
+	if (geo->version == 1) {
+		struct nvm_addr_format_12 *ppaf =
+				(struct nvm_addr_format_12 *)&pblk->addrf;
+
+		ppa.ppa = 0;
+		ppa.g.blk = line_id;
+		ppa.g.pg = (paddr & ppaf->pg_mask) >> ppaf->pg_offset;
+		ppa.g.lun = (paddr & ppaf->lun_mask) >> ppaf->lun_offset;
+		ppa.g.ch = (paddr & ppaf->ch_mask) >> ppaf->ch_offset;
+		ppa.g.pl = (paddr & ppaf->pln_mask) >> ppaf->pln_offset;
+		ppa.g.sec = (paddr & ppaf->sec_mask) >> ppaf->sec_offset;
+	} else {
+		BUG_ON(1);
+		// JAVIER: TODO
+	}
 
 	return ppa;
 }
@@ -987,13 +982,23 @@ static inline struct ppa_addr addr_to_gen_ppa(struct pblk *pblk, u64 paddr,
 static inline u64 pblk_dev_ppa_to_line_addr(struct pblk *pblk,
 							struct ppa_addr p)
 {
+	struct nvm_tgt_dev *dev = pblk->dev;
+	struct nvm_geo *geo = &dev->geo;
 	u64 paddr;
 
-	paddr = (u64)p.g.pg << pblk->ppaf.pg_offset;
-	paddr |= (u64)p.g.lun << pblk->ppaf.lun_offset;
-	paddr |= (u64)p.g.ch << pblk->ppaf.ch_offset;
-	paddr |= (u64)p.g.pl << pblk->ppaf.pln_offset;
-	paddr |= (u64)p.g.sec << pblk->ppaf.sec_offset;
+	if (geo->version == 1) {
+		struct nvm_addr_format_12 *ppaf =
+				(struct nvm_addr_format_12 *)&pblk->addrf;
+
+		paddr = (u64)p.g.pg << ppaf->pg_offset;
+		paddr |= (u64)p.g.lun << ppaf->lun_offset;
+		paddr |= (u64)p.g.ch << ppaf->ch_offset;
+		paddr |= (u64)p.g.pl << ppaf->pln_offset;
+		paddr |= (u64)p.g.sec << ppaf->sec_offset;
+	} else {
+		BUG_ON(1);
+		// JAVIER: TODO
+	}
 
 	return paddr;
 }
@@ -1010,18 +1015,29 @@ static inline struct ppa_addr pblk_ppa32_to_ppa64(struct pblk *pblk, u32 ppa32)
 		ppa64.c.line = ppa32 & ((~0U) >> 1);
 		ppa64.c.is_cached = 1;
 	} else {
-		ppa64.g.blk = (ppa32 & pblk->ppaf.blk_mask) >>
-							pblk->ppaf.blk_offset;
-		ppa64.g.pg = (ppa32 & pblk->ppaf.pg_mask) >>
-							pblk->ppaf.pg_offset;
-		ppa64.g.lun = (ppa32 & pblk->ppaf.lun_mask) >>
-							pblk->ppaf.lun_offset;
-		ppa64.g.ch = (ppa32 & pblk->ppaf.ch_mask) >>
-							pblk->ppaf.ch_offset;
-		ppa64.g.pl = (ppa32 & pblk->ppaf.pln_mask) >>
-							pblk->ppaf.pln_offset;
-		ppa64.g.sec = (ppa32 & pblk->ppaf.sec_mask) >>
-							pblk->ppaf.sec_offset;
+		struct nvm_tgt_dev *dev = pblk->dev;
+		struct nvm_geo *geo = &dev->geo;
+
+		if (geo->version == 1) {
+			struct nvm_addr_format_12 *ppaf;
+
+			ppaf = (struct nvm_addr_format_12 *)&pblk->addrf;
+
+			ppa64.g.blk = (ppa32 & ppaf->blk_mask) >>
+							ppaf->blk_offset;
+			ppa64.g.pg = (ppa32 & ppaf->pg_mask) >>
+							ppaf->pg_offset;
+			ppa64.g.lun = (ppa32 & ppaf->lun_mask) >>
+							ppaf->lun_offset;
+			ppa64.g.ch = (ppa32 & ppaf->ch_mask) >>
+							ppaf->ch_offset;
+			ppa64.g.pl = (ppa32 & ppaf->pln_mask) >>
+							ppaf->pln_offset;
+			ppa64.g.sec = (ppa32 & ppaf->sec_mask) >>
+							ppaf->sec_offset;
+		} else {
+			//JAVIER: TODO
+		}
 	}
 
 	return ppa64;
@@ -1037,12 +1053,23 @@ static inline u32 pblk_ppa64_to_ppa32(struct pblk *pblk, struct ppa_addr ppa64)
 		ppa32 |= ppa64.c.line;
 		ppa32 |= 1U << 31;
 	} else {
-		ppa32 |= ppa64.g.blk << pblk->ppaf.blk_offset;
-		ppa32 |= ppa64.g.pg << pblk->ppaf.pg_offset;
-		ppa32 |= ppa64.g.lun << pblk->ppaf.lun_offset;
-		ppa32 |= ppa64.g.ch << pblk->ppaf.ch_offset;
-		ppa32 |= ppa64.g.pl << pblk->ppaf.pln_offset;
-		ppa32 |= ppa64.g.sec << pblk->ppaf.sec_offset;
+		struct nvm_tgt_dev *dev = pblk->dev;
+		struct nvm_geo *geo = &dev->geo;
+
+		if (geo->version == 1) {
+			struct nvm_addr_format_12 *ppaf;
+
+			ppaf = (struct nvm_addr_format_12 *)&pblk->addrf;
+
+			ppa32 |= ppa64.g.blk << ppaf->blk_offset;
+			ppa32 |= ppa64.g.pg << ppaf->pg_offset;
+			ppa32 |= ppa64.g.lun << ppaf->lun_offset;
+			ppa32 |= ppa64.g.ch << ppaf->ch_offset;
+			ppa32 |= ppa64.g.pl << ppaf->pln_offset;
+			ppa32 |= ppa64.g.sec << ppaf->sec_offset;
+		} else {
+			//JAVIER: TODO
+		}
 	}
 
 	return ppa32;
