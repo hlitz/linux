@@ -116,7 +116,8 @@ static void nvm_remove_tgt_dev(struct nvm_tgt_dev *tgt_dev, int clear)
 }
 
 static struct nvm_tgt_dev *nvm_create_tgt_dev(struct nvm_dev *dev,
-					      int lun_begin, int lun_end)
+					      u16 lun_begin, u16 lun_end,
+					      u16 over_prov)
 {
 	struct nvm_tgt_dev *tgt_dev = NULL;
 	struct nvm_dev_map *dev_rmap = dev->rmap;
@@ -195,6 +196,7 @@ static struct nvm_tgt_dev *nvm_create_tgt_dev(struct nvm_dev *dev,
 	tgt_dev->geo.nr_chnls = nr_chnls;
 	tgt_dev->geo.all_luns = nr_luns;
 	tgt_dev->geo.nr_luns = (lun_balanced) ? prev_nr_luns : -1;
+	tgt_dev->geo.over_prov = over_prov;
 	tgt_dev->total_secs = nr_luns * tgt_dev->geo.sec_per_lun;
 	tgt_dev->q = dev->q;
 	tgt_dev->map = dev_map;
@@ -238,9 +240,9 @@ static struct nvm_tgt_type *nvm_find_target_type(const char *name, int lock)
 	return tt;
 }
 
-static int nvm_create_tgt(struct nvm_dev *dev, struct nvm_ioctl_create *create)
+static int nvm_create_tgt(struct nvm_dev *dev, struct nvm_ioctl_create *create,
+			  struct nvm_ioctl_create_extended e)
 {
-	struct nvm_ioctl_create_simple *s = &create->conf.s;
 	struct request_queue *tqueue;
 	struct gendisk *tdisk;
 	struct nvm_tgt_type *tt;
@@ -264,7 +266,7 @@ static int nvm_create_tgt(struct nvm_dev *dev, struct nvm_ioctl_create *create)
 	}
 	mutex_unlock(&dev->mlock);
 
-	ret = nvm_reserve_luns(dev, s->lun_begin, s->lun_end);
+	ret = nvm_reserve_luns(dev, e.lun_begin, e.lun_end);
 	if (ret)
 		return ret;
 
@@ -274,7 +276,7 @@ static int nvm_create_tgt(struct nvm_dev *dev, struct nvm_ioctl_create *create)
 		goto err_reserve;
 	}
 
-	tgt_dev = nvm_create_tgt_dev(dev, s->lun_begin, s->lun_end);
+	tgt_dev = nvm_create_tgt_dev(dev, e.lun_begin, e.lun_end, e.over_prov);
 	if (!tgt_dev) {
 		pr_err("nvm: could not create target device\n");
 		ret = -ENOMEM;
@@ -344,7 +346,7 @@ err_dev:
 err_t:
 	kfree(t);
 err_reserve:
-	nvm_release_luns_err(dev, s->lun_begin, s->lun_end);
+	nvm_release_luns_err(dev, e.lun_begin, e.lun_end);
 	return ret;
 }
 
@@ -916,10 +918,66 @@ void nvm_unregister(struct nvm_dev *dev)
 }
 EXPORT_SYMBOL(nvm_unregister);
 
+static int nvm_config_check_luns(struct nvm_geo *geo, int lun_begin,
+				 int lun_end)
+{
+	if (lun_begin > lun_end || lun_end >= geo->all_luns) {
+		pr_err("nvm: lun out of bound (%u:%u > %u)\n",
+			lun_begin, lun_end, geo->all_luns - 1);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static int __nvm_config_simple(struct nvm_dev *dev,
+			       struct nvm_ioctl_create_simple *s)
+{
+	struct nvm_geo *geo = &dev->geo;
+
+	if (s->lun_begin == -1 && s->lun_end == -1) {
+		s->lun_begin = 0;
+		s->lun_end = geo->all_luns - 1;
+	}
+
+	return nvm_config_check_luns(geo, s->lun_begin, s->lun_end);
+}
+
+static int __nvm_config_extended(struct nvm_dev *dev,
+				 struct nvm_ioctl_create_extended *e)
+{
+	struct nvm_geo *geo = &dev->geo;
+
+	if (e->lun_begin == 0xFFFF && e->lun_end == 0xFFFF) {
+		e->lun_begin = 0;
+		e->lun_end = dev->geo.all_luns - 1;
+	}
+
+	/* over_prov not set falls into target's default */
+	if (e->over_prov == 0xFFFF) {
+		e->over_prov = NVM_TARGET_DEFAULT_OP;
+	} else if (e->over_prov < NVM_TARGET_MIN_OP) {
+		e->over_prov = NVM_TARGET_MIN_OP;
+		pr_info("nvm: set min. over-provision: %d (min:%d, max:%d)\n",
+							NVM_TARGET_MIN_OP,
+							NVM_TARGET_MIN_OP,
+							NVM_TARGET_MAX_OP);
+	} else if (e->over_prov > NVM_TARGET_MAX_OP) {
+		e->over_prov = NVM_TARGET_MAX_OP;
+		pr_info("nvm: set max. over-provision: %d (min:%d, max:%d)\n",
+							NVM_TARGET_MAX_OP,
+							NVM_TARGET_MIN_OP,
+							NVM_TARGET_MAX_OP);
+	}
+
+	return nvm_config_check_luns(geo, e->lun_begin, e->lun_end);
+}
+
 static int __nvm_configure_create(struct nvm_ioctl_create *create)
 {
+	struct nvm_ioctl_create_extended e;
 	struct nvm_dev *dev;
-	struct nvm_ioctl_create_simple *s;
+	int ret;
 
 	down_write(&nvm_lock);
 	dev = nvm_find_nvm_dev(create->dev);
@@ -930,24 +988,29 @@ static int __nvm_configure_create(struct nvm_ioctl_create *create)
 		return -EINVAL;
 	}
 
-	if (create->conf.type != NVM_CONFIG_TYPE_SIMPLE) {
+	switch (create->conf.type) {
+	case NVM_CONFIG_TYPE_SIMPLE:
+		ret = __nvm_config_simple(dev, &create->conf.s);
+		if (ret)
+			return ret;
+
+		e.lun_begin = create->conf.s.lun_begin;
+		e.lun_end = create->conf.s.lun_end;
+		e.over_prov = NVM_TARGET_DEFAULT_OP;
+		break;
+	case NVM_CONFIG_TYPE_EXTENDED:
+		ret = __nvm_config_extended(dev, &create->conf.e);
+		if (ret)
+			return ret;
+
+		e = create->conf.e;
+		break;
+	default:
 		pr_err("nvm: config type not valid\n");
 		return -EINVAL;
 	}
-	s = &create->conf.s;
 
-	if (s->lun_begin == -1 && s->lun_end == -1) {
-		s->lun_begin = 0;
-		s->lun_end = dev->geo.all_luns - 1;
-	}
-
-	if (s->lun_begin > s->lun_end || s->lun_end >= dev->geo.all_luns) {
-		pr_err("nvm: lun out of bound (%u:%u > %u)\n",
-			s->lun_begin, s->lun_end, dev->geo.all_luns - 1);
-		return -EINVAL;
-	}
-
-	return nvm_create_tgt(dev, create);
+	return nvm_create_tgt(dev, create, e);
 }
 
 static long nvm_ioctl_info(struct file *file, void __user *arg)

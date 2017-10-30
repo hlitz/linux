@@ -585,7 +585,10 @@ static void pblk_set_provision(struct pblk *pblk, long nr_free_blks)
 	sector_t provisioned;
 	int sec_meta, blk_meta;
 
-	pblk->over_prov = 20;
+	if (geo->over_prov == NVM_TARGET_DEFAULT_OP)
+		pblk->over_prov = PBLK_DEFAULT_OP;
+	else
+		pblk->over_prov = geo->over_prov;
 
 	provisioned = nr_free_blks;
 	provisioned *= (100 - pblk->over_prov);
