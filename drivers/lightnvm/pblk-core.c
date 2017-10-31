@@ -1150,7 +1150,7 @@ int pblk_line_recov_alloc(struct pblk *pblk, struct pblk_line *line)
 	}
 	spin_unlock(&l_mg->free_lock);
 
-	pblk_rl_free_lines_dec(&pblk->rl, line);
+	pblk_rl_free_lines_dec(&pblk->rl, line, true);
 
 	if (!pblk_line_init_bb(pblk, line, 0)) {
 		list_add(&line->list, &l_mg->free_list);
@@ -1238,7 +1238,7 @@ retry:
 	l_mg->data_line = retry_line;
 	spin_unlock(&l_mg->free_lock);
 
-	pblk_rl_free_lines_dec(&pblk->rl, retry_line);
+	pblk_rl_free_lines_dec(&pblk->rl, line, false);
 
 	if (pblk_line_erase(pblk, retry_line))
 		goto retry;
@@ -1257,7 +1257,6 @@ struct pblk_line *pblk_line_get_first_data(struct pblk *pblk)
 {
 	struct pblk_line_mgmt *l_mg = &pblk->l_mg;
 	struct pblk_line *line;
-	int is_next = 0;
 
 	spin_lock(&l_mg->free_lock);
 	line = pblk_line_get(pblk);
@@ -1285,7 +1284,6 @@ struct pblk_line *pblk_line_get_first_data(struct pblk *pblk)
 	} else {
 		l_mg->data_next->seq_nr = l_mg->d_seq_nr++;
 		l_mg->data_next->type = PBLK_LINETYPE_DATA;
-		is_next = 1;
 	}
 	spin_unlock(&l_mg->free_lock);
 
@@ -1294,10 +1292,6 @@ struct pblk_line *pblk_line_get_first_data(struct pblk *pblk)
 		if (!line)
 			return NULL;
 	}
-
-	pblk_rl_free_lines_dec(&pblk->rl, line);
-	if (is_next)
-		pblk_rl_free_lines_dec(&pblk->rl, l_mg->data_next);
 
 retry_setup:
 	if (!pblk_line_init_metadata(pblk, line, NULL)) {
@@ -1315,6 +1309,8 @@ retry_setup:
 
 		goto retry_setup;
 	}
+
+	pblk_rl_free_lines_dec(&pblk->rl, line, true);
 
 	return line;
 }
@@ -1400,7 +1396,6 @@ struct pblk_line *pblk_line_replace_data(struct pblk *pblk)
 	struct pblk_line_mgmt *l_mg = &pblk->l_mg;
 	struct pblk_line *cur, *new = NULL;
 	unsigned int left_seblks;
-	int is_next = 0;
 
 	cur = l_mg->data_line;
 	new = l_mg->data_next;
@@ -1449,6 +1444,8 @@ retry_setup:
 		goto retry_setup;
 	}
 
+	pblk_rl_free_lines_dec(&pblk->rl, new, true);
+
 	/* Allocate next line for preparation */
 	spin_lock(&l_mg->free_lock);
 	l_mg->data_next = pblk_line_get(pblk);
@@ -1462,12 +1459,8 @@ retry_setup:
 	} else {
 		l_mg->data_next->seq_nr = l_mg->d_seq_nr++;
 		l_mg->data_next->type = PBLK_LINETYPE_DATA;
-		is_next = 1;
 	}
 	spin_unlock(&l_mg->free_lock);
-
-	if (is_next)
-		pblk_rl_free_lines_dec(&pblk->rl, l_mg->data_next);
 
 out:
 	return new;
@@ -1846,7 +1839,6 @@ void pblk_update_map_dev(struct pblk *pblk, sector_t lba,
 #endif
 	/* Invalidate and discard padded entries */
 	if (lba == ADDR_EMPTY) {
-		atomic64_inc(&pblk->pad_wa);
 #ifdef CONFIG_NVM_DEBUG
 		atomic_long_inc(&pblk->padded_wb);
 #endif
