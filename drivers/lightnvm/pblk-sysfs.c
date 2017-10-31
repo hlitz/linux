@@ -265,30 +265,37 @@ static ssize_t pblk_sysfs_lines(struct pblk *pblk, char *page)
 	return sz;
 }
 
-static ssize_t pblk_sysfs_lines_info(struct pblk *pblk, char *page)
+static ssize_t pblk_sysfs_info(struct pblk *pblk, char *page)
 {
 	struct nvm_tgt_dev *dev = pblk->dev;
 	struct nvm_geo *geo = &dev->geo;
 	struct pblk_line_meta *lm = &pblk->lm;
 	ssize_t sz = 0;
 
-	sz = snprintf(page, PAGE_SIZE - sz,
-				"smeta - len:%d, secs:%d\n",
-					lm->smeta_len, lm->smeta_sec);
+	sz = snprintf(page, PAGE_SIZE,
+		"lun_begin:%d, lun_end:%d, over-provision:%d%% (%d/%lu)\n",
+					lm->smeta_len, lm->smeta_sec,
+					pblk->over_prov,
+					pblk->over_prov_blks,
+					pblk->rl.total_blocks);
 	sz += snprintf(page + sz, PAGE_SIZE - sz,
-				"emeta - len:%d, sec:%d, bb_start:%d\n",
-					lm->emeta_len[0], lm->emeta_sec[0],
-					lm->emeta_bb);
-	sz += snprintf(page + sz, PAGE_SIZE - sz,
-				"bitmap lengths: sec:%d, blk:%d, lun:%d\n",
-					lm->sec_bitmap_len,
-					lm->blk_bitmap_len,
-					lm->lun_bitmap_len);
-	sz += snprintf(page + sz, PAGE_SIZE - sz,
-				"blk_line:%d, sec_line:%d, sec_blk:%d\n",
+		"blk_line:%d, sec_line:%d, sec_blk:%d\n",
 					lm->blk_per_line,
 					lm->sec_per_line,
 					geo->sec_per_chk);
+	sz += snprintf(page + sz, PAGE_SIZE - sz,
+		"smeta - len:%d, secs:%d\n",
+					lm->smeta_len, lm->smeta_sec);
+	sz += snprintf(page + sz, PAGE_SIZE - sz,
+		"emeta - len:%d, sec:%d, bb_start:%d\n",
+					lm->emeta_len[0], lm->emeta_sec[0],
+					lm->emeta_bb);
+	sz += snprintf(page + sz, PAGE_SIZE - sz,
+		"bitmap lengths: sec:%d, blk:%d, lun:%d\n",
+					lm->sec_bitmap_len,
+					lm->blk_bitmap_len,
+					lm->lun_bitmap_len);
+
 
 	return sz;
 }
@@ -512,8 +519,8 @@ static struct attribute sys_lines_attr = {
 	.mode = 0444,
 };
 
-static struct attribute sys_lines_info_attr = {
-	.name = "lines_info",
+static struct attribute sys_info_attr = {
+	.name = "info",
 	.mode = 0444,
 };
 
@@ -559,7 +566,7 @@ static struct attribute *pblk_attrs[] = {
 	&sys_rb_attr,
 	&sys_stats_ppaf_attr,
 	&sys_lines_attr,
-	&sys_lines_info_attr,
+	&sys_info_attr,
 	&sys_write_amp_mileage,
 	&sys_write_amp_trip,
 	&sys_padding_dist,
@@ -588,8 +595,8 @@ static ssize_t pblk_sysfs_show(struct kobject *kobj, struct attribute *attr,
 		return pblk_sysfs_ppaf(pblk, buf);
 	else if (strcmp(attr->name, "lines") == 0)
 		return pblk_sysfs_lines(pblk, buf);
-	else if (strcmp(attr->name, "lines_info") == 0)
-		return pblk_sysfs_lines_info(pblk, buf);
+	else if (strcmp(attr->name, "info") == 0)
+		return pblk_sysfs_info(pblk, buf);
 	else if (strcmp(attr->name, "max_sec_per_write") == 0)
 		return pblk_sysfs_get_sec_per_write(pblk, buf);
 	else if (strcmp(attr->name, "write_amp_mileage") == 0)
