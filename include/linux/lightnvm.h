@@ -67,10 +67,13 @@ struct nvm_rq;
 struct nvm_id;
 struct nvm_dev;
 struct nvm_tgt_dev;
+struct nvm_chunk_log_page;
 
 typedef int (nvm_id_fn)(struct nvm_dev *, struct nvm_id *);
 typedef int (nvm_op_bb_tbl_fn)(struct nvm_dev *, struct ppa_addr, u8 *);
 typedef int (nvm_op_set_bb_fn)(struct nvm_dev *, struct ppa_addr *, int, int);
+typedef int (nvm_get_chunk_lp_fn)(struct nvm_dev *, struct nvm_chunk_log_page *,
+				  unsigned long, unsigned long);
 typedef int (nvm_submit_io_fn)(struct nvm_dev *, struct nvm_rq *);
 typedef int (nvm_submit_io_sync_fn)(struct nvm_dev *, struct nvm_rq *);
 typedef void *(nvm_create_dma_pool_fn)(struct nvm_dev *, char *);
@@ -83,6 +86,8 @@ struct nvm_dev_ops {
 	nvm_id_fn		*identity;
 	nvm_op_bb_tbl_fn	*get_bb_tbl;
 	nvm_op_set_bb_fn	*set_bb_tbl;
+
+	nvm_get_chunk_lp_fn	*get_chunk_log_page;
 
 	nvm_submit_io_fn	*submit_io;
 	nvm_submit_io_sync_fn	*submit_io_sync;
@@ -241,6 +246,23 @@ struct nvm_addr_format {
 	u64	rsv_mask[2];
 };
 
+enum {
+	NVM_CHK_FREE =		1 << 0,
+	NVM_CHK_CLOSED =	1 << 1,
+	NVM_CHK_OPEN =		1 << 2,
+	NVM_CHK_OFFLINE =	1 << 3,
+};
+
+struct nvm_chunk_log_page {
+	__u8	state;
+	__u8	type;
+	__u8	wear_index;
+	__u8	rsvd[5];
+	__u64	slba;
+	__u64	cnlb;
+	__u64	wp;
+};
+
 struct nvm_id {
 	u8	ver_id;
 	u8	vmnt;
@@ -321,9 +343,10 @@ struct nvm_geo {
 
 	/* generic geometry */
 	int nr_chnls;
-	int all_luns; /* across channels */
 	int nr_luns; /* per channel */
 	int nr_chks; /* per lun */
+	int all_luns; /* across channels */
+	int all_chunks; /*across channels */
 
 	int sec_size;
 	int oob_size;
@@ -494,6 +517,9 @@ extern struct nvm_dev *nvm_alloc_dev(int);
 extern int nvm_register(struct nvm_dev *);
 extern void nvm_unregister(struct nvm_dev *);
 
+extern int nvm_get_chunk_log_page(struct nvm_tgt_dev *,
+				  struct nvm_chunk_log_page *,
+				  unsigned long ,unsigned long);
 extern int nvm_set_tgt_bb_tbl(struct nvm_tgt_dev *, struct ppa_addr *,
 			      int, int);
 extern int nvm_max_phys_sects(struct nvm_tgt_dev *);
