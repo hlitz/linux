@@ -18,31 +18,6 @@
 
 #include "pblk.h"
 
-static void pblk_line_mark_bb(struct work_struct *work)
-{
-	struct pblk_line_ws *line_ws = container_of(work, struct pblk_line_ws,
-									ws);
-	struct pblk *pblk = line_ws->pblk;
-	struct nvm_tgt_dev *dev = pblk->dev;
-	struct ppa_addr *ppa = line_ws->priv;
-	int ret;
-
-	ret = nvm_set_tgt_bb_tbl(dev, ppa, 1, NVM_BLK_T_GRWN_BAD);
-	if (ret) {
-		struct pblk_line *line;
-		int pos;
-
-		line = &pblk->lines[pblk_ppa_to_line(*ppa)];
-		pos = pblk_ppa_to_pos(&dev->geo, *ppa);
-
-		pr_err("pblk: failed to mark bb, line:%d, pos:%d\n",
-				line->id, pos);
-	}
-
-	kfree(ppa);
-	mempool_free(line_ws, pblk->gen_ws_pool);
-}
-
 static void pblk_mark_bb(struct pblk *pblk, struct pblk_line *line,
 			 struct ppa_addr *ppa)
 {
@@ -57,9 +32,6 @@ static void pblk_mark_bb(struct pblk *pblk, struct pblk_line *line,
 	if (test_and_set_bit(pos, line->blk_bitmap))
 		pr_err("pblk: attempted to erase bb: line:%d, pos:%d\n",
 							line->id, pos);
-
-	pblk_gen_run_ws(pblk, NULL, ppa, pblk_line_mark_bb,
-						GFP_ATOMIC, pblk->bb_wq);
 }
 
 static void __pblk_end_io_erase(struct pblk *pblk, struct nvm_rq *rqd)
