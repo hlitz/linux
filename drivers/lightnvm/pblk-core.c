@@ -92,6 +92,47 @@ static void pblk_end_io_erase(struct nvm_rq *rqd)
 	mempool_free(rqd, pblk->e_rq_pool);
 }
 
+/*
+ * Get information for all chunks from the device.
+ *
+ * The caller is responsible for freeing the returned structure
+ */
+struct nvm_chunk_log_page *pblk_chunk_get_info(struct pblk *pblk)
+{
+	struct nvm_tgt_dev *dev = pblk->dev;
+	struct nvm_geo *geo = &dev->geo;
+	struct nvm_chunk_log_page *log;
+	unsigned long len;
+	int ret;
+
+	len = geo->all_chunks * sizeof(*log);
+	log = kzalloc(len, GFP_KERNEL);
+	if (!log)
+		return ERR_PTR(-ENOMEM);
+
+	ret = nvm_get_chunk_log_page(dev, log, 0, len);
+	if (ret) {
+		pr_err("pblk: could not get chunk log page (%d)\n", ret);
+		kfree(log);
+		return ERR_PTR(-EIO);
+	}
+
+	return log;
+}
+
+struct nvm_chunk_log_page *pblk_chunk_get_off(struct pblk *pblk,
+					      struct nvm_chunk_log_page *lp,
+					      struct ppa_addr ppa)
+{
+	struct nvm_tgt_dev *dev = pblk->dev;
+	struct nvm_geo *geo = &dev->geo;
+	int ch_off = ppa.m.ch * geo->nr_chks * geo->nr_luns;
+	int lun_off = ppa.m.lun * geo->nr_chks;
+	int chk_off = ppa.m.chk;
+
+	return lp + ch_off + lun_off + chk_off;
+}
+
 void __pblk_map_invalidate(struct pblk *pblk, struct pblk_line *line,
 			   u64 paddr)
 {
