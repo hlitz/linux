@@ -31,8 +31,6 @@
 
 enum nvme_nvm_admin_opcode {
 	nvme_nvm_admin_identity		= 0xe2,
-	nvme_nvm_admin_get_bb_tbl	= 0xf2,
-	nvme_nvm_admin_set_bb_tbl	= 0xf1,
 };
 
 enum nvme_nvm_log_page {
@@ -96,33 +94,6 @@ struct nvme_nvm_l2ptbl {
 	__le16			cdw14[6];
 };
 
-struct nvme_nvm_getbbtbl {
-	__u8			opcode;
-	__u8			flags;
-	__u16			command_id;
-	__le32			nsid;
-	__u64			rsvd[2];
-	__le64			prp1;
-	__le64			prp2;
-	__le64			spba;
-	__u32			rsvd4[4];
-};
-
-struct nvme_nvm_setbbtbl {
-	__u8			opcode;
-	__u8			flags;
-	__u16			command_id;
-	__le32			nsid;
-	__le64			rsvd[2];
-	__le64			prp1;
-	__le64			prp2;
-	__le64			spba;
-	__le16			nlb;
-	__u8			value;
-	__u8			rsvd3;
-	__u32			rsvd4[3];
-};
-
 struct nvme_nvm_erase_blk {
 	__u8			opcode;
 	__u8			flags;
@@ -145,8 +116,6 @@ struct nvme_nvm_command {
 		struct nvme_nvm_hb_rw hb_rw;
 		struct nvme_nvm_ph_rw ph_rw;
 		struct nvme_nvm_l2ptbl l2p;
-		struct nvme_nvm_getbbtbl get_bb;
-		struct nvme_nvm_setbbtbl set_bb;
 		struct nvme_nvm_erase_blk erase;
 	};
 };
@@ -264,20 +233,6 @@ struct nvme_nvm_id {
 	struct nvme_nvm_id_group groups[4];
 } __packed;
 
-struct nvme_nvm_bb_tbl {
-	__u8	tblid[4];
-	__le16	verid;
-	__le16	revid;
-	__le32	rvsd1;
-	__le32	tblks;
-	__le32	tfact;
-	__le32	tgrown;
-	__le32	tdresv;
-	__le32	thresv;
-	__le32	rsvd2[8];
-	__u8	blk[0];
-};
-
 /*
  * Check we didn't inadvertently grow the command struct
  */
@@ -286,14 +241,11 @@ static inline void _nvme_nvm_check_size(void)
 	BUILD_BUG_ON(sizeof(struct nvme_nvm_identity) != 64);
 	BUILD_BUG_ON(sizeof(struct nvme_nvm_hb_rw) != 64);
 	BUILD_BUG_ON(sizeof(struct nvme_nvm_ph_rw) != 64);
-	BUILD_BUG_ON(sizeof(struct nvme_nvm_getbbtbl) != 64);
-	BUILD_BUG_ON(sizeof(struct nvme_nvm_setbbtbl) != 64);
 	BUILD_BUG_ON(sizeof(struct nvme_nvm_l2ptbl) != 64);
 	BUILD_BUG_ON(sizeof(struct nvme_nvm_erase_blk) != 64);
 	BUILD_BUG_ON(sizeof(struct nvme_nvm_id_group) != 960);
 	BUILD_BUG_ON(sizeof(struct nvme_nvm_addr_format_12) != 16);
 	BUILD_BUG_ON(sizeof(struct nvme_nvm_id) != NVME_IDENTIFY_DATA_SIZE);
-	BUILD_BUG_ON(sizeof(struct nvme_nvm_bb_tbl) != 64);
 }
 
 static void nvme_nvm_set_addr_12(struct nvm_addr_format_12 *dst,
@@ -475,83 +427,6 @@ out:
 	return ret;
 }
 
-static int nvme_nvm_get_bb_tbl(struct nvm_dev *nvmdev, struct ppa_addr ppa,
-								u8 *blks)
-{
-	struct request_queue *q = nvmdev->q;
-	struct nvm_geo *geo = &nvmdev->geo;
-	struct nvme_ns *ns = q->queuedata;
-	struct nvme_ctrl *ctrl = ns->ctrl;
-	struct nvme_nvm_command c = {};
-	struct nvme_nvm_bb_tbl *bb_tbl;
-	int nr_blks = geo->nr_chks * geo->plane_mode;
-	int tblsz = sizeof(struct nvme_nvm_bb_tbl) + nr_blks;
-	int ret = 0;
-
-	c.get_bb.opcode = nvme_nvm_admin_get_bb_tbl;
-	c.get_bb.nsid = cpu_to_le32(ns->ns_id);
-	c.get_bb.spba = cpu_to_le64(ppa.ppa);
-
-	bb_tbl = kzalloc(tblsz, GFP_KERNEL);
-	if (!bb_tbl)
-		return -ENOMEM;
-
-	ret = nvme_submit_sync_cmd(ctrl->admin_q, (struct nvme_command *)&c,
-								bb_tbl, tblsz);
-	if (ret) {
-		dev_err(ctrl->device, "get bad block table failed (%d)\n", ret);
-		ret = -EIO;
-		goto out;
-	}
-
-	if (bb_tbl->tblid[0] != 'B' || bb_tbl->tblid[1] != 'B' ||
-		bb_tbl->tblid[2] != 'L' || bb_tbl->tblid[3] != 'T') {
-		dev_err(ctrl->device, "bbt format mismatch\n");
-		ret = -EINVAL;
-		goto out;
-	}
-
-	if (le16_to_cpu(bb_tbl->verid) != 1) {
-		ret = -EINVAL;
-		dev_err(ctrl->device, "bbt version not supported\n");
-		goto out;
-	}
-
-	if (le32_to_cpu(bb_tbl->tblks) != nr_blks) {
-		ret = -EINVAL;
-		dev_err(ctrl->device,
-				"bbt unsuspected blocks returned (%u!=%u)",
-				le32_to_cpu(bb_tbl->tblks), nr_blks);
-		goto out;
-	}
-
-	memcpy(blks, bb_tbl->blk, geo->nr_chks * geo->plane_mode);
-out:
-	kfree(bb_tbl);
-	return ret;
-}
-
-static int nvme_nvm_set_bb_tbl(struct nvm_dev *nvmdev, struct ppa_addr *ppas,
-							int nr_ppas, int type)
-{
-	struct nvme_ns *ns = nvmdev->q->queuedata;
-	struct nvme_nvm_command c = {};
-	int ret = 0;
-
-	c.set_bb.opcode = nvme_nvm_admin_set_bb_tbl;
-	c.set_bb.nsid = cpu_to_le32(ns->ns_id);
-	c.set_bb.spba = cpu_to_le64(ppas->ppa);
-	c.set_bb.nlb = cpu_to_le16(nr_ppas - 1);
-	c.set_bb.value = type;
-
-	ret = nvme_submit_sync_cmd(ns->ctrl->admin_q, (struct nvme_command *)&c,
-								NULL, 0);
-	if (ret)
-		dev_err(ns->ctrl->device, "set bad block table failed (%d)\n",
-									ret);
-	return ret;
-}
-
 static int nvme_nvm_get_chunk_log_page(struct nvm_dev *nvmdev,
 				       struct nvm_chunk_log_page *log,
 				       unsigned long off,
@@ -727,9 +602,6 @@ static void nvme_nvm_dev_dma_free(void *pool, void *addr,
 
 static struct nvm_dev_ops nvme_nvm_dev_ops = {
 	.identity		= nvme_nvm_identity,
-
-	.get_bb_tbl		= nvme_nvm_get_bb_tbl,
-	.set_bb_tbl		= nvme_nvm_set_bb_tbl,
 
 	.get_chunk_log_page	= nvme_nvm_get_chunk_log_page,
 

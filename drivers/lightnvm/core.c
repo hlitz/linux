@@ -596,51 +596,6 @@ static struct nvm_dev *nvm_find_nvm_dev(const char *name)
 	return NULL;
 }
 
-static int nvm_set_rqd_ppalist(struct nvm_tgt_dev *tgt_dev, struct nvm_rq *rqd,
-			const struct ppa_addr *ppas, int nr_ppas)
-{
-	struct nvm_dev *dev = tgt_dev->parent;
-	struct nvm_geo *geo = &tgt_dev->geo;
-	int i, plane_cnt, pl_idx;
-	struct ppa_addr ppa;
-
-	if (geo->plane_mode == NVM_PLANE_SINGLE && nr_ppas == 1) {
-		rqd->nr_ppas = nr_ppas;
-		rqd->ppa_addr = ppas[0];
-
-		return 0;
-	}
-
-	rqd->nr_ppas = nr_ppas;
-	rqd->ppa_list = nvm_dev_dma_alloc(dev, GFP_KERNEL, &rqd->dma_ppa_list);
-	if (!rqd->ppa_list) {
-		pr_err("nvm: failed to allocate dma memory\n");
-		return -ENOMEM;
-	}
-
-	plane_cnt = geo->plane_mode;
-	rqd->nr_ppas *= plane_cnt;
-
-	for (i = 0; i < nr_ppas; i++) {
-		for (pl_idx = 0; pl_idx < plane_cnt; pl_idx++) {
-			ppa = ppas[i];
-			ppa.g.pl = pl_idx;
-			rqd->ppa_list[(pl_idx * nr_ppas) + i] = ppa;
-		}
-	}
-
-	return 0;
-}
-
-static void nvm_free_rqd_ppalist(struct nvm_tgt_dev *tgt_dev,
-			struct nvm_rq *rqd)
-{
-	if (!rqd->ppa_list)
-		return;
-
-	nvm_dev_dma_free(tgt_dev->parent, rqd->ppa_list, rqd->dma_ppa_list);
-}
-
 int nvm_get_chunk_log_page(struct nvm_tgt_dev *tgt_dev,
 			   struct nvm_chunk_log_page *log,
 			   unsigned long off, unsigned long len)
@@ -649,34 +604,6 @@ int nvm_get_chunk_log_page(struct nvm_tgt_dev *tgt_dev,
 
 	return dev->ops->get_chunk_log_page(tgt_dev->parent, log, off, len);
 }
-
-int nvm_set_tgt_bb_tbl(struct nvm_tgt_dev *tgt_dev, struct ppa_addr *ppas,
-		       int nr_ppas, int type)
-{
-	struct nvm_dev *dev = tgt_dev->parent;
-	struct nvm_rq rqd;
-	int ret;
-
-	if (nr_ppas > dev->ops->max_phys_sect) {
-		pr_err("nvm: unable to update all blocks atomically\n");
-		return -EINVAL;
-	}
-
-	memset(&rqd, 0, sizeof(struct nvm_rq));
-
-	nvm_set_rqd_ppalist(tgt_dev, &rqd, ppas, nr_ppas);
-	nvm_rq_tgt_to_dev(tgt_dev, &rqd);
-
-	ret = dev->ops->set_bb_tbl(dev, &rqd.ppa_addr, rqd.nr_ppas, type);
-	nvm_free_rqd_ppalist(tgt_dev, &rqd);
-	if (ret) {
-		pr_err("nvm: failed bb mark\n");
-		return -EINVAL;
-	}
-
-	return 0;
-}
-EXPORT_SYMBOL(nvm_set_tgt_bb_tbl);
 
 int nvm_max_phys_sects(struct nvm_tgt_dev *tgt_dev)
 {
@@ -738,53 +665,6 @@ void nvm_end_io(struct nvm_rq *rqd)
 		rqd->end_io(rqd);
 }
 EXPORT_SYMBOL(nvm_end_io);
-
-/*
- * folds a bad block list from its plane representation to its virtual
- * block representation. The fold is done in place and reduced size is
- * returned.
- *
- * If any of the planes status are bad or grown bad block, the virtual block
- * is marked bad. If not bad, the first plane state acts as the block state.
- */
-int nvm_bb_tbl_fold(struct nvm_dev *dev, u8 *blks, int nr_blks)
-{
-	struct nvm_geo *geo = &dev->geo;
-	int blk, offset, pl, blktype;
-
-	if (nr_blks != geo->nr_chks * geo->plane_mode)
-		return -EINVAL;
-
-	for (blk = 0; blk < geo->nr_chks; blk++) {
-		offset = blk * geo->plane_mode;
-		blktype = blks[offset];
-
-		/* Bad blocks on any planes take precedence over other types */
-		for (pl = 0; pl < geo->plane_mode; pl++) {
-			if (blks[offset + pl] &
-					(NVM_BLK_T_BAD|NVM_BLK_T_GRWN_BAD)) {
-				blktype = blks[offset + pl];
-				break;
-			}
-		}
-
-		blks[blk] = blktype;
-	}
-
-	return geo->nr_chks;
-}
-EXPORT_SYMBOL(nvm_bb_tbl_fold);
-
-int nvm_get_tgt_bb_tbl(struct nvm_tgt_dev *tgt_dev, struct ppa_addr ppa,
-		       u8 *blks)
-{
-	struct nvm_dev *dev = tgt_dev->parent;
-
-	nvm_ppa_tgt_to_dev(tgt_dev, &ppa, 1);
-
-	return dev->ops->get_bb_tbl(dev, ppa, blks);
-}
-EXPORT_SYMBOL(nvm_get_tgt_bb_tbl);
 
 static int nvm_core_init(struct nvm_dev *dev)
 {
