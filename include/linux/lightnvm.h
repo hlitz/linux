@@ -247,6 +247,7 @@ enum {
 	NVM_CHK_CLOSED =	1 << 1,
 	NVM_CHK_OPEN =		1 << 2,
 	NVM_CHK_OFFLINE =	1 << 3,
+	NVM_CHK_HOST_USE =	1 << 4, // JAVIER: TO DISCUSS
 };
 
 struct nvm_chunk_log_page {

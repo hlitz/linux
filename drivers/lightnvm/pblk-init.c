@@ -876,7 +876,7 @@ add_emeta_page:
 		line->pblk = pblk;
 		line->id = i;
 		line->type = PBLK_LINETYPE_FREE;
-		line->state = PBLK_LINESTATE_FREE;
+		line->state = PBLK_LINESTATE_NEW;
 		line->gc_group = PBLK_LINEGC_NONE;
 		line->vsc = &l_mg->vsc_list[i];
 		spin_lock_init(&line->lock);
