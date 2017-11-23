@@ -121,27 +121,42 @@ static ssize_t pblk_sysfs_ppaf(struct pblk *pblk, char *page)
 		struct nvm_addr_format_12 *geo_ppaf =
 				(struct nvm_addr_format_12 *)&geo->addrf;
 
-		sz = snprintf(page, PAGE_SIZE - sz,
-			"g:(b:%d)blk:%d/%d,pg:%d/%d,lun:%d/%d,ch:%d/%d,pl:%d/%d,sec:%d/%d\n",
+		sz = snprintf(page, PAGE_SIZE,
+			"pblk:(s:%d)ch:%d/%d,lun:%d/%d,blk:%d/%d,pg:%d/%d,pl:%d/%d,sec:%d/%d\n",
 			pblk->addrf_len,
+			ppaf->ch_offset, ppaf->ch_len,
+			ppaf->lun_offset, ppaf->lun_len,
 			ppaf->blk_offset, ppaf->blk_len,
 			ppaf->pg_offset, ppaf->pg_len,
-			ppaf->lun_offset, ppaf->lun_len,
-			ppaf->ch_offset, ppaf->ch_len,
 			ppaf->pln_offset, ppaf->pln_len,
 			ppaf->sec_offset, ppaf->sec_len);
 
 		sz += snprintf(page + sz, PAGE_SIZE - sz,
-			"d:blk:%d/%d,pg:%d/%d,lun:%d/%d,ch:%d/%d,pl:%d/%d,sec:%d/%d\n",
+			"Device:ch:%d/%d,lun:%d/%d,blk:%d/%d,pg:%d/%d,pl:%d/%d,sec:%d/%d\n",
+			geo_ppaf->ch_offset, geo_ppaf->ch_len,
+			geo_ppaf->lun_offset, geo_ppaf->lun_len,
 			geo_ppaf->blk_offset, geo_ppaf->blk_len,
 			geo_ppaf->pg_offset, geo_ppaf->pg_len,
-			geo_ppaf->lun_offset, geo_ppaf->lun_len,
-			geo_ppaf->ch_offset, geo_ppaf->ch_len,
 			geo_ppaf->pln_offset, geo_ppaf->pln_len,
 			geo_ppaf->sec_offset, geo_ppaf->sec_len);
 	} else {
-		//JAVIER TODO
-		BUG_ON(1);
+		struct nvm_addr_format *ppaf = &pblk->addrf;
+		struct nvm_addr_format *geo_ppaf = &geo->addrf;
+
+		sz = snprintf(page, PAGE_SIZE,
+			"pblk:(s:%d)ch:%d/%d,lun:%d/%d,chk:%d/%d/sec:%d/%d\n",
+			pblk->addrf_len,
+			ppaf->ch_offset, ppaf->ch_len,
+			ppaf->lun_offset, ppaf->lun_len,
+			ppaf->chk_offset, ppaf->chk_len,
+			ppaf->sec_offset, ppaf->sec_len);
+
+		sz += snprintf(page + sz, PAGE_SIZE - sz,
+			"Device:ch:%d/%d,lun:%d/%d,chk:%d/%d,sec:%d/%d\n",
+			geo_ppaf->ch_offset, geo_ppaf->ch_len,
+			geo_ppaf->lun_offset, geo_ppaf->lun_len,
+			geo_ppaf->chk_offset, geo_ppaf->chk_len,
+			geo_ppaf->sec_offset, geo_ppaf->sec_len);
 	}
 
 	return sz;
