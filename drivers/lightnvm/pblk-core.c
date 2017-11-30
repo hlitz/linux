@@ -876,6 +876,8 @@ int pblk_line_erase(struct pblk *pblk, struct pblk_line *line)
 
 	/* Erase only good blocks, one at a time */
 	do {
+		int bit_set;
+
 		spin_lock(&line->lock);
 		bit = find_next_zero_bit(line->erase_bitmap, lm->blk_per_line,
 								bit + 1);
@@ -888,9 +890,9 @@ int pblk_line_erase(struct pblk *pblk, struct pblk_line *line)
 		ppa.g.blk = line->id;
 
 		atomic_dec(&line->left_eblks);
-		WARN_ON(test_and_set_bit(bit, line->erase_bitmap));
+		bit_set = test_and_set_bit(bit, line->erase_bitmap);
 		spin_unlock(&line->lock);
-
+		WARN_ON(bit_set);
 		ret = pblk_blk_erase_sync(pblk, ppa);
 		if (ret) {
 			pr_err("pblk: failed to erase line %d\n", line->id);
