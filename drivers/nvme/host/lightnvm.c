@@ -944,8 +944,27 @@ static ssize_t nvm_dev_attr_show(struct device *dev,
 		return scnprintf(page, PAGE_SIZE, "%u.%u\n",
 						dev_geo->major_ver_id,
 						dev_geo->minor_ver_id);
-	} else if (strcmp(attr->name, "capabilities") == 0) {
-		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->c.cap);
+	} else if (strcmp(attr->name, "clba") == 0) {
+		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->c.clba);
+	} else if (strcmp(attr->name, "csecs") == 0) {
+		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->c.csecs);
+	} else if (strcmp(attr->name, "sos") == 0) {
+		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->c.sos);
+	} else if (strcmp(attr->name, "ws_min") == 0) {
+		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->c.ws_min);
+	} else if (strcmp(attr->name, "ws_opt") == 0) {
+		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->c.ws_opt);
+	} else if (strcmp(attr->name, "maxoc") == 0) {
+		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->c.maxoc);
+	} else if (strcmp(attr->name, "maxocpu") == 0) {
+		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->c.maxocpu);
+	} else if (strcmp(attr->name, "mw_cunits") == 0) {
+		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->c.mw_cunits);
+	} else if (strcmp(attr->name, "media_capabilities") == 0) {
+		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->c.mccap);
+	} else if (strcmp(attr->name, "max_phys_secs") == 0) {
+		return scnprintf(page, PAGE_SIZE, "%u\n",
+				ndev->ops->max_phys_sect);
 	} else if (strcmp(attr->name, "read_typ") == 0) {
 		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->c.trdt);
 	} else if (strcmp(attr->name, "read_max") == 0) {
@@ -984,19 +1003,8 @@ static ssize_t nvm_dev_attr_show_12(struct device *dev,
 
 	attr = &dattr->attr;
 
-	if (strcmp(attr->name, "vendor_opcode") == 0) {
-		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->c.vmnt);
-	} else if (strcmp(attr->name, "device_mode") == 0) {
-		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->c.dom);
-	/* kept for compatibility */
-	} else if (strcmp(attr->name, "media_manager") == 0) {
-		return scnprintf(page, PAGE_SIZE, "%s\n", "gennvm");
-	} else if (strcmp(attr->name, "ppa_format") == 0) {
+	if (strcmp(attr->name, "ppa_format") == 0) {
 		return nvm_dev_attr_show_ppaf((void *)&dev_geo->c.addrf, page);
-	} else if (strcmp(attr->name, "media_type") == 0) {	/* u8 */
-		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->c.mtype);
-	} else if (strcmp(attr->name, "flash_media_type") == 0) {
-		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->c.fmtype);
 	} else if (strcmp(attr->name, "num_channels") == 0) {
 		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->num_ch);
 	} else if (strcmp(attr->name, "num_luns") == 0) {
@@ -1011,8 +1019,6 @@ static ssize_t nvm_dev_attr_show_12(struct device *dev,
 		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->c.fpg_sz);
 	} else if (strcmp(attr->name, "hw_sector_size") == 0) {
 		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->c.csecs);
-	} else if (strcmp(attr->name, "oob_sector_size") == 0) {/* u32 */
-		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->c.sos);
 	} else if (strcmp(attr->name, "prog_typ") == 0) {
 		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->c.tprt);
 	} else if (strcmp(attr->name, "prog_max") == 0) {
@@ -1021,18 +1027,37 @@ static ssize_t nvm_dev_attr_show_12(struct device *dev,
 		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->c.tbet);
 	} else if (strcmp(attr->name, "erase_max") == 0) {
 		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->c.tbem);
+	} else if (strcmp(attr->name, "vendor_opcode") == 0) {
+		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->c.vmnt);
+	} else if (strcmp(attr->name, "device_mode") == 0) {
+		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->c.dom);
+	/* kept for compatibility */
+	} else if (strcmp(attr->name, "media_manager") == 0) {
+		return scnprintf(page, PAGE_SIZE, "%s\n", "gennvm");
+	} else if (strcmp(attr->name, "capabilities") == 0) {
+		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->c.cap);
+	} else if (strcmp(attr->name, "media_type") == 0) {	/* u8 */
+		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->c.mtype);
+	} else if (strcmp(attr->name, "flash_media_type") == 0) {
+		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->c.fmtype);
 	} else if (strcmp(attr->name, "multiplane_modes") == 0) {
 		return scnprintf(page, PAGE_SIZE, "0x%08x\n", dev_geo->c.mpos);
-	} else if (strcmp(attr->name, "media_capabilities") == 0) {
-		return scnprintf(page, PAGE_SIZE, "0x%08x\n", dev_geo->c.mccap);
-	} else if (strcmp(attr->name, "max_phys_secs") == 0) {
-		return scnprintf(page, PAGE_SIZE, "%u\n",
-				ndev->ops->max_phys_sect);
 	} else {
 		return scnprintf(page, PAGE_SIZE,
 			"Unhandled attr(%s) in `nvm_dev_attr_show_12`\n",
 			attr->name);
 	}
+}
+
+static ssize_t nvm_dev_attr_show_lbaf(struct nvm_addr_format *lbaf,
+					 char *page)
+{
+	return scnprintf(page, PAGE_SIZE,
+		"0x%02x%02x%02x%02x%02x%02x%02x%02x\n",
+				lbaf->ch_offset, lbaf->ch_len,
+				lbaf->lun_offset, lbaf->lun_len,
+				lbaf->chk_offset, lbaf->chk_len,
+				lbaf->sec_offset, lbaf->sec_len);
 }
 
 static ssize_t nvm_dev_attr_show_20(struct device *dev,
@@ -1048,20 +1073,14 @@ static ssize_t nvm_dev_attr_show_20(struct device *dev,
 
 	attr = &dattr->attr;
 
-	if (strcmp(attr->name, "groups") == 0) {
+	if (strcmp(attr->name, "lba_format") == 0) {
+		return nvm_dev_attr_show_lbaf((void *)&dev_geo->c.addrf, page);
+	} else if (strcmp(attr->name, "groups") == 0) {
 		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->num_ch);
 	} else if (strcmp(attr->name, "punits") == 0) {
 		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->num_lun);
 	} else if (strcmp(attr->name, "chunks") == 0) {
 		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->c.num_chk);
-	} else if (strcmp(attr->name, "clba") == 0) {
-		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->c.clba);
-	} else if (strcmp(attr->name, "ws_min") == 0) {
-		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->c.ws_min);
-	} else if (strcmp(attr->name, "ws_opt") == 0) {
-		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->c.ws_opt);
-	} else if (strcmp(attr->name, "mw_cunits") == 0) {
-		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->c.mw_cunits);
 	} else if (strcmp(attr->name, "write_typ") == 0) {
 		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->c.tprt);
 	} else if (strcmp(attr->name, "write_max") == 0) {
@@ -1086,7 +1105,19 @@ static ssize_t nvm_dev_attr_show_20(struct device *dev,
 
 /* general attributes */
 static NVM_DEV_ATTR_RO(version);
-static NVM_DEV_ATTR_RO(capabilities);
+
+static NVM_DEV_ATTR_RO(ws_min);
+static NVM_DEV_ATTR_RO(ws_opt);
+static NVM_DEV_ATTR_RO(mw_cunits);
+static NVM_DEV_ATTR_RO(maxoc);
+static NVM_DEV_ATTR_RO(maxocpu);
+
+static NVM_DEV_ATTR_RO(media_capabilities);
+static NVM_DEV_ATTR_RO(max_phys_secs);
+
+static NVM_DEV_ATTR_RO(clba);
+static NVM_DEV_ATTR_RO(csecs);
+static NVM_DEV_ATTR_RO(sos);
 
 static NVM_DEV_ATTR_RO(read_typ);
 static NVM_DEV_ATTR_RO(read_max);
@@ -1105,42 +1136,53 @@ static NVM_DEV_ATTR_12_RO(num_blocks);
 static NVM_DEV_ATTR_12_RO(num_pages);
 static NVM_DEV_ATTR_12_RO(page_size);
 static NVM_DEV_ATTR_12_RO(hw_sector_size);
-static NVM_DEV_ATTR_12_RO(oob_sector_size);
 static NVM_DEV_ATTR_12_RO(prog_typ);
 static NVM_DEV_ATTR_12_RO(prog_max);
 static NVM_DEV_ATTR_12_RO(erase_typ);
 static NVM_DEV_ATTR_12_RO(erase_max);
 static NVM_DEV_ATTR_12_RO(multiplane_modes);
-static NVM_DEV_ATTR_12_RO(media_capabilities);
-static NVM_DEV_ATTR_12_RO(max_phys_secs);
+static NVM_DEV_ATTR_12_RO(capabilities);
 
 static struct attribute *nvm_dev_attrs_12[] = {
 	&dev_attr_version.attr,
-	&dev_attr_capabilities.attr,
-
-	&dev_attr_vendor_opcode.attr,
-	&dev_attr_device_mode.attr,
-	&dev_attr_media_manager.attr,
 	&dev_attr_ppa_format.attr,
-	&dev_attr_media_type.attr,
-	&dev_attr_flash_media_type.attr,
+
 	&dev_attr_num_channels.attr,
 	&dev_attr_num_luns.attr,
 	&dev_attr_num_planes.attr,
 	&dev_attr_num_blocks.attr,
 	&dev_attr_num_pages.attr,
 	&dev_attr_page_size.attr,
+
 	&dev_attr_hw_sector_size.attr,
-	&dev_attr_oob_sector_size.attr,
+
+	&dev_attr_clba.attr,
+	&dev_attr_csecs.attr,
+	&dev_attr_sos.attr,
+
+	&dev_attr_ws_min.attr,
+	&dev_attr_ws_opt.attr,
+	&dev_attr_maxoc.attr,
+	&dev_attr_maxocpu.attr,
+	&dev_attr_mw_cunits.attr,
+
+	&dev_attr_media_capabilities.attr,
+	&dev_attr_max_phys_secs.attr,
+
 	&dev_attr_read_typ.attr,
 	&dev_attr_read_max.attr,
 	&dev_attr_prog_typ.attr,
 	&dev_attr_prog_max.attr,
 	&dev_attr_erase_typ.attr,
 	&dev_attr_erase_max.attr,
+
+	&dev_attr_vendor_opcode.attr,
+	&dev_attr_device_mode.attr,
+	&dev_attr_media_manager.attr,
+	&dev_attr_capabilities.attr,
+	&dev_attr_media_type.attr,
+	&dev_attr_flash_media_type.attr,
 	&dev_attr_multiplane_modes.attr,
-	&dev_attr_media_capabilities.attr,
-	&dev_attr_max_phys_secs.attr,
 
 	NULL,
 };
@@ -1152,12 +1194,9 @@ static const struct attribute_group nvm_dev_attr_group_12 = {
 
 /* 2.0 values */
 static NVM_DEV_ATTR_20_RO(groups);
+static NVM_DEV_ATTR_20_RO(lba_format);
 static NVM_DEV_ATTR_20_RO(punits);
 static NVM_DEV_ATTR_20_RO(chunks);
-static NVM_DEV_ATTR_20_RO(clba);
-static NVM_DEV_ATTR_20_RO(ws_min);
-static NVM_DEV_ATTR_20_RO(ws_opt);
-static NVM_DEV_ATTR_20_RO(mw_cunits);
 static NVM_DEV_ATTR_20_RO(write_typ);
 static NVM_DEV_ATTR_20_RO(write_max);
 static NVM_DEV_ATTR_20_RO(reset_typ);
@@ -1165,15 +1204,24 @@ static NVM_DEV_ATTR_20_RO(reset_max);
 
 static struct attribute *nvm_dev_attrs_20[] = {
 	&dev_attr_version.attr,
-	&dev_attr_capabilities.attr,
+	&dev_attr_lba_format.attr,
 
 	&dev_attr_groups.attr,
 	&dev_attr_punits.attr,
 	&dev_attr_chunks.attr,
+
 	&dev_attr_clba.attr,
+	&dev_attr_csecs.attr,
+	&dev_attr_sos.attr,
+
 	&dev_attr_ws_min.attr,
 	&dev_attr_ws_opt.attr,
+	&dev_attr_maxoc.attr,
+	&dev_attr_maxocpu.attr,
 	&dev_attr_mw_cunits.attr,
+
+	&dev_attr_media_capabilities.attr,
+	&dev_attr_max_phys_secs.attr,
 
 	&dev_attr_read_typ.attr,
 	&dev_attr_read_max.attr,
