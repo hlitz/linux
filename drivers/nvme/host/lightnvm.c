@@ -36,7 +36,7 @@ enum nvme_nvm_admin_opcode {
 };
 
 enum nvme_nvm_log_page {
-	NVME_NVM_LOG_REPORT_CHUNK	= 0xCA,
+	NVME_NVM_LOG_REPORT_CHUNK	= 0xca,
 };
 
 struct nvme_nvm_ph_rw {
@@ -240,6 +240,16 @@ struct nvme_nvm_id20 {
 	__u8			vs[1024];
 };
 
+struct nvme_nvm_chk_meta {
+	__u8	state;
+	__u8	type;
+	__u8	wli;
+	__u8	rsvd[5];
+	__le64	slba;
+	__le64	cnlb;
+	__le64	wp;
+};
+
 /*
  * Check we didn't inadvertently grow the command struct
  */
@@ -256,6 +266,9 @@ static inline void _nvme_nvm_check_size(void)
 	BUILD_BUG_ON(sizeof(struct nvme_nvm_bb_tbl) != 64);
 	BUILD_BUG_ON(sizeof(struct nvme_nvm_id20_addrf) != 8);
 	BUILD_BUG_ON(sizeof(struct nvme_nvm_id20) != NVME_IDENTIFY_DATA_SIZE);
+	BUILD_BUG_ON(sizeof(struct nvme_nvm_chk_meta) != 32);
+	BUILD_BUG_ON(sizeof(struct nvme_nvm_chk_meta) !=
+						sizeof(struct nvm_chk_meta));
 }
 
 static int init_grp(struct nvm_id *nvm_id, struct nvme_nvm_id12 *id12)
@@ -478,46 +491,44 @@ static int nvme_nvm_set_bb_tbl(struct nvm_dev *nvmdev, struct ppa_addr *ppas,
 	return ret;
 }
 
-static int nvme_nvm_get_chunk_log_page(struct nvm_dev *nvmdev,
-				       struct nvm_chunk_log_page *log,
-				       unsigned long off,
-				       unsigned long total_len)
+static int nvme_nvm_get_chk_meta(struct nvm_dev *ndev,
+				 struct nvm_chk_meta *meta,
+				 sector_t slba, int nchks)
 {
-	struct nvme_ns *ns = nvmdev->q->queuedata;
-	struct nvme_command c = { };
-	unsigned long offset = off, left = total_len;
-	unsigned long len, len_dwords;
-	void *buf = log;
-	int ret;
+	struct nvme_ns *ns = ndev->q->queuedata;
+	struct nvme_ctrl *ctrl = ns->ctrl;
+	struct nvme_nvm_chk_meta *dev_meta = (struct nvme_nvm_chk_meta *)meta;
+	size_t left = nchks * sizeof(struct nvme_nvm_chk_meta);
+	size_t offset, len;
+	int ret, i;
 
-	/* The offset needs to be dword-aligned */
-	if (offset & 0x3)
-		return -EINVAL;
+	offset = slba * sizeof(struct nvme_nvm_chk_meta);
 
-	do {
-		/* Send 256KB at a time */
-		len = (1 << 18) > left ? left : (1 << 18);
-		len_dwords = (len >> 2) - 1;
+	while (left) {
+		len = min_t(unsigned, left, ctrl->max_hw_sectors << 9);
 
-		c.get_log_page.opcode = nvme_admin_get_log_page;
-		c.get_log_page.nsid = cpu_to_le32(ns->head->ns_id);
-		c.get_log_page.lid = NVME_NVM_LOG_REPORT_CHUNK;
-		c.get_log_page.lpol = cpu_to_le32(offset & 0xffffffff);
-		c.get_log_page.lpou = cpu_to_le32(offset >> 32);
-		c.get_log_page.numdl = cpu_to_le16(len_dwords & 0xffff);
-		c.get_log_page.numdu = cpu_to_le16(len_dwords >> 16);
-
-		ret = nvme_submit_sync_cmd(ns->ctrl->admin_q, &c, buf, len);
+		ret = nvme_get_log_ext(ctrl, ns, NVME_NVM_LOG_REPORT_CHUNK,
+				dev_meta, len, offset);
 		if (ret) {
-			dev_err(ns->ctrl->device,
-				"get chunk log page failed (%d)\n", ret);
+			dev_err(ctrl->device, "Get REPORT CHUNK log error\n");
 			break;
 		}
 
-		buf += len;
+		for (i = 0; i < len; i += sizeof(struct nvme_nvm_chk_meta)) {
+			meta->state = dev_meta->state;
+			meta->type = dev_meta->type;
+			meta->wli = dev_meta->wli;
+			meta->slba = le64_to_cpu(dev_meta->slba);
+			meta->cnlb = le64_to_cpu(dev_meta->cnlb);
+			meta->wp = le64_to_cpu(dev_meta->wp);
+
+			meta++;
+			dev_meta++;
+		}
+
 		offset += len;
 		left -= len;
-	} while (left);
+	}
 
 	return ret;
 }
@@ -653,7 +664,7 @@ static struct nvm_dev_ops nvme_nvm_dev_ops = {
 	.get_bb_tbl		= nvme_nvm_get_bb_tbl,
 	.set_bb_tbl		= nvme_nvm_set_bb_tbl,
 
-	.get_chunk_log_page	= nvme_nvm_get_chunk_log_page,
+	.get_chk_meta		= nvme_nvm_get_chk_meta,
 
 	.submit_io		= nvme_nvm_submit_io,
 	.submit_io_sync		= nvme_nvm_submit_io_sync,

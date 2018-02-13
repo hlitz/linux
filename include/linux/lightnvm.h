@@ -49,13 +49,13 @@ struct nvm_rq;
 struct nvm_id;
 struct nvm_dev;
 struct nvm_tgt_dev;
-struct nvm_chunk_log_page;
+struct nvm_chk_meta;
 
 typedef int (nvm_id_fn)(struct nvm_dev *, struct nvm_id *);
 typedef int (nvm_op_bb_tbl_fn)(struct nvm_dev *, struct ppa_addr, u8 *);
 typedef int (nvm_op_set_bb_fn)(struct nvm_dev *, struct ppa_addr *, int, int);
-typedef int (nvm_get_chunk_lp_fn)(struct nvm_dev *, struct nvm_chunk_log_page *,
-				  unsigned long, unsigned long);
+typedef int (nvm_get_chk_meta_fn)(struct nvm_dev *, struct nvm_chk_meta *,
+								sector_t, int);
 typedef int (nvm_submit_io_fn)(struct nvm_dev *, struct nvm_rq *);
 typedef int (nvm_submit_io_sync_fn)(struct nvm_dev *, struct nvm_rq *);
 typedef void *(nvm_create_dma_pool_fn)(struct nvm_dev *, char *);
@@ -69,7 +69,7 @@ struct nvm_dev_ops {
 	nvm_op_bb_tbl_fn	*get_bb_tbl;
 	nvm_op_set_bb_fn	*set_bb_tbl;
 
-	nvm_get_chunk_lp_fn	*get_chunk_log_page;
+	nvm_get_chk_meta_fn	*get_chk_meta;
 
 	nvm_submit_io_fn	*submit_io;
 	nvm_submit_io_sync_fn	*submit_io_sync;
@@ -214,29 +214,6 @@ struct nvm_id {
 	u16	fpg_sz;
 } __packed;
 
-enum {
-	/* Chunk states */
-	NVM_CHK_ST_FREE =	1 << 0,
-	NVM_CHK_ST_CLOSED =	1 << 1,
-	NVM_CHK_ST_OPEN =	1 << 2,
-	NVM_CHK_ST_OFFLINE =	1 << 3,
-
-	/* Chunk types */
-	NVM_CHK_TP_W_SEQ =	1 << 0,
-	NVM_CHK_TP_W_RAN =	1 << 2,
-	NVM_CHK_TP_SZ_SPEC =	1 << 4,
-};
-
-struct nvm_chunk_log_page {
-	__u8	state;
-	__u8	type;
-	__u8	wear_index;
-	__u8	rsvd[5];
-	__u64	slba;
-	__u64	cnlb;
-	__u64	wp;
-};
-
 struct nvm_target {
 	struct list_head list;
 	struct nvm_tgt_dev *dev;
@@ -307,10 +284,9 @@ enum {
 struct nvm_geo {
 	/* generic geometry */
 	int nr_chnls;
+	int all_luns; /* across channels */
 	int nr_luns; /* per channel */
 	int nr_chks; /* per lun */
-	int all_luns; /* across channels */
-	int all_chunks; /*across channels */
 
 	int sec_size;
 	int oob_size;
@@ -380,6 +356,20 @@ struct nvm_dev {
 	/* target management */
 	struct list_head area_list;
 	struct list_head targets;
+};
+
+/*
+ * Note: The structure size is linked to nvme_nvm_chk_meta such that the same
+ * buffer can be used when converting from little endian to cpu addressing.
+ */
+struct nvm_chk_meta {
+	u8	state;
+	u8	type;
+	u8	wli;
+	u8	rsvd[5];
+	u64	slba;
+	u64	cnlb;
+	u64	wp;
 };
 
 static inline struct ppa_addr generic_to_dev_addr(struct nvm_tgt_dev *tgt_dev,
@@ -463,9 +453,6 @@ extern struct nvm_dev *nvm_alloc_dev(int);
 extern int nvm_register(struct nvm_dev *);
 extern void nvm_unregister(struct nvm_dev *);
 
-extern int nvm_get_chunk_log_page(struct nvm_tgt_dev *,
-				  struct nvm_chunk_log_page *,
-				  unsigned long, unsigned long);
 extern int nvm_set_tgt_bb_tbl(struct nvm_tgt_dev *, struct ppa_addr *,
 			      int, int);
 extern int nvm_submit_io(struct nvm_tgt_dev *, struct nvm_rq *);
