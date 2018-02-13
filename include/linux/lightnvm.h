@@ -214,6 +214,19 @@ struct nvm_id {
 	u16	fpg_sz;
 } __packed;
 
+enum {
+	/* Chunk states */
+	NVM_CHK_ST_FREE =	1 << 0,
+	NVM_CHK_ST_CLOSED =	1 << 1,
+	NVM_CHK_ST_OPEN =	1 << 2,
+	NVM_CHK_ST_OFFLINE =	1 << 3,
+
+	/* Chunk types */
+	NVM_CHK_TP_W_SEQ =	1 << 0,
+	NVM_CHK_TP_W_RAN =	1 << 1,
+	NVM_CHK_TP_SZ =		1 << 4,
+};
+
 struct nvm_target {
 	struct list_head list;
 	struct nvm_tgt_dev *dev;
