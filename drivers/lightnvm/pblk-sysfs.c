@@ -117,12 +117,12 @@ static ssize_t pblk_sysfs_ppaf(struct pblk *pblk, char *page)
 	struct nvm_addr_format_12 *geo_ppaf;
 	ssize_t sz = 0;
 
-	ppaf = (struct nvm_addr_format_12 *)&pblk->ppaf;
+	ppaf = (struct nvm_addr_format_12 *)&pblk->addrf;
 	geo_ppaf = (struct nvm_addr_format_12 *)&geo->c.addrf;
 
 	sz = snprintf(page, PAGE_SIZE,
 		"pblk:(s:%d)ch:%d/%d,lun:%d/%d,blk:%d/%d,pg:%d/%d,pl:%d/%d,sec:%d/%d\n",
-			pblk->ppaf_bitsize,
+			pblk->addrf_len,
 			ppaf->ch_offset, ppaf->ch_len,
 			ppaf->lun_offset, ppaf->lun_len,
 			ppaf->blk_offset, ppaf->blk_len,
