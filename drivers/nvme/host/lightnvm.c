@@ -318,6 +318,8 @@ static int nvme_nvm_setup_12(struct nvme_nvm_id12 *id,
 	dev_geo->c.ws_min = sec_per_pg;
 	dev_geo->c.ws_opt = sec_per_pg;
 	dev_geo->c.mw_cunits = 8;		/* default to MLC safe values */
+	dev_geo->c.maxoc = dev_geo->all_luns;	/* default to 1 chunk per LUN */
+	dev_geo->c.maxocpu = 1;			/* default to 1 chunk per LUN */
 
 	dev_geo->c.mccap = le32_to_cpu(src->mccap);
 
@@ -405,6 +407,8 @@ static int nvme_nvm_setup_20(struct nvme_nvm_id20 *id,
 	dev_geo->c.ws_min = le32_to_cpu(id->ws_min);
 	dev_geo->c.ws_opt = le32_to_cpu(id->ws_opt);
 	dev_geo->c.mw_cunits = le32_to_cpu(id->mw_cunits);
+	dev_geo->c.maxoc = le32_to_cpu(id->maxoc);
+	dev_geo->c.maxocpu = le32_to_cpu(id->maxocpu);
 
 	dev_geo->c.mccap = le32_to_cpu(id->mccap);
 
