@@ -262,21 +262,21 @@ static void nvme_nvm_set_addr_12(struct nvm_addr_format_12 *dst,
 	dst->blk_len = src->blk_len;
 	dst->pg_len = src->pg_len;
 	dst->pln_len = src->pln_len;
-	dst->sect_len = src->sec_len;
+	dst->sec_len = src->sec_len;
 
 	dst->ch_offset = src->ch_offset;
 	dst->lun_offset = src->lun_offset;
 	dst->blk_offset = src->blk_offset;
 	dst->pg_offset = src->pg_offset;
 	dst->pln_offset = src->pln_offset;
-	dst->sect_offset = src->sec_offset;
+	dst->sec_offset = src->sec_offset;
 
 	dst->ch_mask = ((1ULL << dst->ch_len) - 1) << dst->ch_offset;
 	dst->lun_mask = ((1ULL << dst->lun_len) - 1) << dst->lun_offset;
 	dst->blk_mask = ((1ULL << dst->blk_len) - 1) << dst->blk_offset;
 	dst->pg_mask = ((1ULL << dst->pg_len) - 1) << dst->pg_offset;
 	dst->pln_mask = ((1ULL << dst->pln_len) - 1) << dst->pln_offset;
-	dst->sec_mask = ((1ULL << dst->sect_len) - 1) << dst->sect_offset;
+	dst->sec_mask = ((1ULL << dst->sec_len) - 1) << dst->sec_offset;
 }
 
 static int nvme_nvm_setup_12(struct nvme_nvm_id12 *id,
@@ -956,7 +956,7 @@ static ssize_t nvm_dev_attr_show_ppaf(struct nvm_addr_format_12 *ppaf,
 				ppaf->pln_offset, ppaf->pln_len,
 				ppaf->blk_offset, ppaf->blk_len,
 				ppaf->pg_offset, ppaf->pg_len,
-				ppaf->sect_offset, ppaf->sect_len);
+				ppaf->sec_offset, ppaf->sec_len);
 }
 
 static ssize_t nvm_dev_attr_show_12(struct device *dev,

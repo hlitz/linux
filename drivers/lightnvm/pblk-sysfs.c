@@ -128,7 +128,7 @@ static ssize_t pblk_sysfs_ppaf(struct pblk *pblk, char *page)
 			ppaf->blk_offset, ppaf->blk_len,
 			ppaf->pg_offset, ppaf->pg_len,
 			ppaf->pln_offset, ppaf->pln_len,
-			ppaf->sect_offset, ppaf->sect_len);
+			ppaf->sec_offset, ppaf->sec_len);
 
 	sz += snprintf(page + sz, PAGE_SIZE - sz,
 		"device:ch:%d/%d,lun:%d/%d,blk:%d/%d,pg:%d/%d,pl:%d/%d,sec:%d/%d\n",
@@ -137,7 +137,7 @@ static ssize_t pblk_sysfs_ppaf(struct pblk *pblk, char *page)
 			geo_ppaf->blk_offset, geo_ppaf->blk_len,
 			geo_ppaf->pg_offset, geo_ppaf->pg_len,
 			geo_ppaf->pln_offset, geo_ppaf->pln_len,
-			geo_ppaf->sect_offset, geo_ppaf->sect_len);
+			geo_ppaf->sec_offset, geo_ppaf->sec_len);
 
 	return sz;
 }

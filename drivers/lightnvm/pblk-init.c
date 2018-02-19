@@ -179,16 +179,16 @@ static int pblk_set_addrf_12(struct nvm_geo *geo,
 	dst->blk_len = src->blk_len;
 	dst->pg_len = src->pg_len;
 	dst->pln_len = src->pln_len;
-	dst->sect_len = src->sect_len;
+	dst->sec_len = src->sec_len;
 
-	dst->sect_offset = 0;
-	dst->pln_offset = dst->sect_len;
+	dst->sec_offset = 0;
+	dst->pln_offset = dst->sec_len;
 	dst->ch_offset = dst->pln_offset + dst->pln_len;
 	dst->lun_offset = dst->ch_offset + dst->ch_len;
 	dst->pg_offset = dst->lun_offset + dst->lun_len;
 	dst->blk_offset = dst->pg_offset + dst->pg_len;
 
-	dst->sec_mask = ((1ULL << dst->sect_len) - 1) << dst->sect_offset;
+	dst->sec_mask = ((1ULL << dst->sec_len) - 1) << dst->sec_offset;
 	dst->pln_mask = ((1ULL << dst->pln_len) - 1) << dst->pln_offset;
 	dst->ch_mask = ((1ULL << dst->ch_len) - 1) << dst->ch_offset;
 	dst->lun_mask = ((1ULL << dst->lun_len) - 1) << dst->lun_offset;
