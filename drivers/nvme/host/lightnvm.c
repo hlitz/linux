@@ -392,6 +392,8 @@ static int nvme_nvm_setup_20(struct nvme_nvm_id20 *id,
 	dev_geo->c.ws_opt = le32_to_cpu(id->ws_opt);
 	dev_geo->c.mw_cunits = le32_to_cpu(id->mw_cunits);
 
+	dev_geo->c.mccap = le32_to_cpu(id->mccap);
+
 	dev_geo->c.trdt = le32_to_cpu(id->trdt);
 	dev_geo->c.trdm = le32_to_cpu(id->trdm);
 	dev_geo->c.tprt = le32_to_cpu(id->twrt);
