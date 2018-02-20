@@ -941,7 +941,7 @@ static inline int pblk_ppa_to_line(struct ppa_addr p)
 
 static inline int pblk_ppa_to_pos(struct nvm_geo *geo, struct ppa_addr p)
 {
-	return p.g.lun * geo->nr_chnls + p.g.ch;
+	return p.g.lun * geo->num_ch + p.g.ch;
 }
 
 static inline struct ppa_addr addr_to_gen_ppa(struct pblk *pblk, u64 paddr,
@@ -1214,8 +1214,8 @@ static inline int pblk_boundary_ppa_checks(struct nvm_tgt_dev *tgt_dev,
 		ppa = &ppas[i];
 
 		if (!ppa->c.is_cached &&
-				ppa->g.ch < geo->nr_chnls &&
-				ppa->g.lun < geo->nr_luns &&
+				ppa->g.ch < geo->num_ch &&
+				ppa->g.lun < geo->num_lun &&
 				ppa->g.pl < geo->c.num_pln &&
 				ppa->g.blk < geo->c.num_chk &&
 				ppa->g.pg < geo->c.num_pg &&

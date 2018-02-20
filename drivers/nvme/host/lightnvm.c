@@ -299,9 +299,9 @@ static int nvme_nvm_setup_12(struct nvme_nvm_id12 *id,
 	dev_geo->major_ver_id = id->ver_id;
 	dev_geo->minor_ver_id = 2;
 
-	dev_geo->nr_chnls = src->num_ch;
-	dev_geo->nr_luns = src->num_lun;
-	dev_geo->all_luns = dev_geo->nr_chnls * dev_geo->nr_luns;
+	dev_geo->num_ch = src->num_ch;
+	dev_geo->num_lun = src->num_lun;
+	dev_geo->all_luns = dev_geo->num_ch * dev_geo->num_lun;
 
 	dev_geo->c.num_chk = le16_to_cpu(src->num_chk);
 	dev_geo->c.csecs = le16_to_cpu(src->csecs);
@@ -387,9 +387,9 @@ static int nvme_nvm_setup_20(struct nvme_nvm_id20 *id,
 		return -EINVAL;
 	}
 
-	dev_geo->nr_chnls = le16_to_cpu(id->num_grp);
-	dev_geo->nr_luns = le16_to_cpu(id->num_pu);
-	dev_geo->all_luns = dev_geo->nr_chnls * dev_geo->nr_luns;
+	dev_geo->num_ch = le16_to_cpu(id->num_grp);
+	dev_geo->num_lun = le16_to_cpu(id->num_pu);
+	dev_geo->all_luns = dev_geo->num_ch * dev_geo->num_lun;
 
 	dev_geo->c.num_chk = le32_to_cpu(id->num_chk);
 	dev_geo->c.clba = le32_to_cpu(id->clba);
@@ -980,9 +980,9 @@ static ssize_t nvm_dev_attr_show_12(struct device *dev,
 	} else if (strcmp(attr->name, "flash_media_type") == 0) {
 		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->c.fmtype);
 	} else if (strcmp(attr->name, "num_channels") == 0) {
-		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->nr_chnls);
+		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->num_ch);
 	} else if (strcmp(attr->name, "num_luns") == 0) {
-		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->nr_luns);
+		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->num_lun);
 	} else if (strcmp(attr->name, "num_planes") == 0) {
 		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->c.num_pln);
 	} else if (strcmp(attr->name, "num_blocks") == 0) {	/* u16 */
@@ -1030,9 +1030,9 @@ static ssize_t nvm_dev_attr_show_20(struct device *dev,
 	attr = &dattr->attr;
 
 	if (strcmp(attr->name, "groups") == 0) {
-		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->nr_chnls);
+		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->num_ch);
 	} else if (strcmp(attr->name, "punits") == 0) {
-		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->nr_luns);
+		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->num_lun);
 	} else if (strcmp(attr->name, "chunks") == 0) {
 		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->c.num_chk);
 	} else if (strcmp(attr->name, "clba") == 0) {

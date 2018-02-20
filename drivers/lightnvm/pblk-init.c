@@ -162,15 +162,15 @@ static int pblk_set_addrf_12(struct nvm_geo *geo,
 	int power_len;
 
 	/* Re-calculate channel and lun format to adapt to configuration */
-	power_len = get_count_order(geo->nr_chnls);
-	if (1 << power_len != geo->nr_chnls) {
+	power_len = get_count_order(geo->num_ch);
+	if (1 << power_len != geo->num_ch) {
 		pr_err("pblk: supports only power-of-two channel config.\n");
 		return -EINVAL;
 	}
 	dst->ch_len = power_len;
 
-	power_len = get_count_order(geo->nr_luns);
-	if (1 << power_len != geo->nr_luns) {
+	power_len = get_count_order(geo->num_lun);
+	if (1 << power_len != geo->num_lun) {
 		pr_err("pblk: supports only power-of-two LUN config.\n");
 		return -EINVAL;
 	}
@@ -498,7 +498,7 @@ static int pblk_luns_init(struct pblk *pblk, struct ppa_addr *luns)
 	int i;
 
 	/* TODO: Implement unbalanced LUN support */
-	if (geo->nr_luns < 0) {
+	if (geo->num_lun < 0) {
 		pr_err("pblk: unbalanced LUN config.\n");
 		return -EINVAL;
 	}
@@ -510,9 +510,9 @@ static int pblk_luns_init(struct pblk *pblk, struct ppa_addr *luns)
 
 	for (i = 0; i < geo->all_luns; i++) {
 		/* Stripe across channels */
-		int ch = i % geo->nr_chnls;
-		int lun_raw = i / geo->nr_chnls;
-		int lunid = lun_raw + ch * geo->nr_luns;
+		int ch = i % geo->num_ch;
+		int lun_raw = i / geo->num_ch;
+		int lunid = lun_raw + ch * geo->num_lun;
 
 		rlun = &pblk->luns[i];
 		rlun->bppa = luns[lunid];

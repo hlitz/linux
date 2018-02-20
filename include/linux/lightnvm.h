@@ -246,8 +246,8 @@ struct nvm_dev_geo {
 	u8	minor_ver_id;
 
 	/* full device geometry */
-	u16	nr_chnls;
-	u16	nr_luns;
+	u16	num_ch;
+	u16	num_lun;
 
 	/* calculated values */
 	u16	all_luns;
@@ -323,8 +323,8 @@ enum {
 /* Instance geometry */
 struct nvm_geo {
 	/* instance specific geometry */
-	int nr_chnls;
-	int nr_luns;		/* per channel */
+	int num_ch;
+	int num_lun;		/* per channel */
 
 	int op;
 
