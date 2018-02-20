@@ -914,8 +914,8 @@ static ssize_t nvm_dev_attr_show(struct device *dev,
 
 	if (strcmp(attr->name, "version") == 0) {
 		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->ver_id);
-	} else if (strcmp(attr->name, "capabilities") == 0) {
-		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->c.cap);
+	} else if (strcmp(attr->name, "media_capabilities") == 0) {
+		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->c.mccap);
 	} else if (strcmp(attr->name, "read_typ") == 0) {
 		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->c.trdt);
 	} else if (strcmp(attr->name, "read_max") == 0) {
@@ -993,8 +993,8 @@ static ssize_t nvm_dev_attr_show_12(struct device *dev,
 		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->c.tbem);
 	} else if (strcmp(attr->name, "multiplane_modes") == 0) {
 		return scnprintf(page, PAGE_SIZE, "0x%08x\n", dev_geo->c.mpos);
-	} else if (strcmp(attr->name, "media_capabilities") == 0) {
-		return scnprintf(page, PAGE_SIZE, "0x%08x\n", dev_geo->c.mccap);
+	} else if (strcmp(attr->name, "capabilities") == 0) {
+		return scnprintf(page, PAGE_SIZE, "0x%08x\n", dev_geo->c.cap);
 	} else if (strcmp(attr->name, "max_phys_secs") == 0) {
 		return scnprintf(page, PAGE_SIZE, "%u\n", NVM_MAX_VLBA);
 	} else {
@@ -1055,7 +1055,7 @@ static ssize_t nvm_dev_attr_show_20(struct device *dev,
 
 /* general attributes */
 static NVM_DEV_ATTR_RO(version);
-static NVM_DEV_ATTR_RO(capabilities);
+static NVM_DEV_ATTR_RO(media_capabilities);
 
 static NVM_DEV_ATTR_RO(read_typ);
 static NVM_DEV_ATTR_RO(read_max);
@@ -1080,12 +1080,12 @@ static NVM_DEV_ATTR_12_RO(prog_max);
 static NVM_DEV_ATTR_12_RO(erase_typ);
 static NVM_DEV_ATTR_12_RO(erase_max);
 static NVM_DEV_ATTR_12_RO(multiplane_modes);
-static NVM_DEV_ATTR_12_RO(media_capabilities);
+static NVM_DEV_ATTR_12_RO(capabilities);
 static NVM_DEV_ATTR_12_RO(max_phys_secs);
 
 static struct attribute *nvm_dev_attrs_12[] = {
 	&dev_attr_version.attr,
-	&dev_attr_capabilities.attr,
+	&dev_attr_media_capabilities.attr,
 
 	&dev_attr_vendor_opcode.attr,
 	&dev_attr_device_mode.attr,
@@ -1108,7 +1108,7 @@ static struct attribute *nvm_dev_attrs_12[] = {
 	&dev_attr_erase_typ.attr,
 	&dev_attr_erase_max.attr,
 	&dev_attr_multiplane_modes.attr,
-	&dev_attr_media_capabilities.attr,
+	&dev_attr_capabilities.attr,
 	&dev_attr_max_phys_secs.attr,
 
 	NULL,
@@ -1134,7 +1134,7 @@ static NVM_DEV_ATTR_20_RO(reset_max);
 
 static struct attribute *nvm_dev_attrs_20[] = {
 	&dev_attr_version.attr,
-	&dev_attr_capabilities.attr,
+	&dev_attr_media_capabilities.attr,
 
 	&dev_attr_groups.attr,
 	&dev_attr_punits.attr,
