@@ -296,7 +296,8 @@ static int nvme_nvm_setup_12(struct nvme_nvm_id12 *id,
 	}
 
 	/* 1.2 spec. only reports a single version id - unfold */
-	dev_geo->ver_id = id->ver_id;
+	dev_geo->major_ver_id = id->ver_id;
+	dev_geo->minor_ver_id = 2;
 
 	dev_geo->nr_chnls = src->num_ch;
 	dev_geo->nr_luns = src->num_lun;
@@ -377,7 +378,14 @@ static void nvme_nvm_set_addr_20(struct nvm_addr_format *dst,
 static int nvme_nvm_setup_20(struct nvme_nvm_id20 *id,
 			     struct nvm_dev_geo *dev_geo)
 {
-	dev_geo->ver_id = id->mjr;
+	dev_geo->major_ver_id = id->mjr;
+	dev_geo->minor_ver_id = id->mnr;
+
+	if (!(dev_geo->major_ver_id == 2 && dev_geo->minor_ver_id == 0)) {
+		pr_err("nvm: OCSSD version not supported (v%d.%d)\n",
+				dev_geo->major_ver_id, dev_geo->minor_ver_id);
+		return -EINVAL;
+	}
 
 	dev_geo->nr_chnls = le16_to_cpu(id->num_grp);
 	dev_geo->nr_luns = le16_to_cpu(id->num_pu);
@@ -913,7 +921,11 @@ static ssize_t nvm_dev_attr_show(struct device *dev,
 	attr = &dattr->attr;
 
 	if (strcmp(attr->name, "version") == 0) {
-		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->ver_id);
+		return scnprintf(page, PAGE_SIZE, "%u\n",
+						dev_geo->major_ver_id);
+	} else if (strcmp(attr->name, "subversion") == 0) {
+		return scnprintf(page, PAGE_SIZE, "%u\n",
+						dev_geo->minor_ver_id);
 	} else if (strcmp(attr->name, "media_capabilities") == 0) {
 		return scnprintf(page, PAGE_SIZE, "%u\n", dev_geo->c.mccap);
 	} else if (strcmp(attr->name, "read_typ") == 0) {
@@ -1055,6 +1067,7 @@ static ssize_t nvm_dev_attr_show_20(struct device *dev,
 
 /* general attributes */
 static NVM_DEV_ATTR_RO(version);
+static NVM_DEV_ATTR_RO(subversion);
 static NVM_DEV_ATTR_RO(media_capabilities);
 
 static NVM_DEV_ATTR_RO(read_typ);
@@ -1085,6 +1098,7 @@ static NVM_DEV_ATTR_12_RO(max_phys_secs);
 
 static struct attribute *nvm_dev_attrs_12[] = {
 	&dev_attr_version.attr,
+	&dev_attr_subversion.attr,
 	&dev_attr_media_capabilities.attr,
 
 	&dev_attr_vendor_opcode.attr,
@@ -1134,6 +1148,7 @@ static NVM_DEV_ATTR_20_RO(reset_max);
 
 static struct attribute *nvm_dev_attrs_20[] = {
 	&dev_attr_version.attr,
+	&dev_attr_subversion.attr,
 	&dev_attr_media_capabilities.attr,
 
 	&dev_attr_groups.attr,
@@ -1167,7 +1182,7 @@ int nvme_nvm_register_sysfs(struct nvme_ns *ns)
 	if (!ndev)
 		return -EINVAL;
 
-	switch (dev_geo->ver_id) {
+	switch (dev_geo->major_ver_id) {
 	case 1:
 		return sysfs_create_group(&disk_to_dev(ns->disk)->kobj,
 					&nvm_dev_attr_group_12);
@@ -1184,7 +1199,7 @@ void nvme_nvm_unregister_sysfs(struct nvme_ns *ns)
 	struct nvm_dev *ndev = ns->ndev;
 	struct nvm_dev_geo *dev_geo = &ndev->dev_geo;
 
-	switch (dev_geo->ver_id) {
+	switch (dev_geo->major_ver_id) {
 	case 1:
 		sysfs_remove_group(&disk_to_dev(ns->disk)->kobj,
 					&nvm_dev_attr_group_12);

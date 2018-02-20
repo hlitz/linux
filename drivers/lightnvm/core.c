@@ -897,8 +897,8 @@ static int nvm_init(struct nvm_dev *dev)
 		goto err;
 	}
 
-	pr_debug("nvm: ver:%u nvm_vendor:%x\n",
-				dev_geo->ver_id,
+	pr_debug("nvm: ver:%u.%u nvm_vendor:%x\n",
+				dev_geo->major_ver_id, dev_geo->minor_ver_id,
 				dev_geo->c.vmnt);
 
 	ret = nvm_core_init(dev);

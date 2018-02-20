@@ -242,7 +242,8 @@ struct nvm_common_geo {
 /* Device identified geometry */
 struct nvm_dev_geo {
 	/* device reported version */
-	u8	ver_id;
+	u8	major_ver_id;
+	u8	minor_ver_id;
 
 	/* full device geometry */
 	u16	nr_chnls;
